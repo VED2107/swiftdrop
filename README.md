@@ -33,13 +33,13 @@ SwiftDrop has two deliverables:
 | | What | Where |
 |---|---|---|
 | **SwiftDrop.exe** | The app. Local server + web UI in one file; runs on the user's Windows PC. | `pnpm build:exe` → `release/SwiftDrop.exe` (Node single executable, ~90 MB). Publish it on GitHub Releases or any file host. |
-| **Landing page** | Marketing + download page (`apps/site`). Static. | Vercel, configured by `vercel.json` at the repo root. |
+| **Landing page** | Marketing + download page (`apps/site`). Static. | Vercel, root directory `apps/site` (config in `apps/site/vercel.json`). |
 
 **Why the app itself can't run on Vercel:** SwiftDrop's server must run on the PC that receives the files — it writes to the local disk, shows the PC's LAN address in the QR code, and phones connect to it over Wi-Fi. A cloud deployment can't reach your disk, would route file bytes through the internet, caps request bodies at ~4.5 MB, and a page served over `https://*.vercel.app` is blocked by browsers from talking to `http://192.168.x.x`. So Vercel serves only the landing page.
 
 ### Deploy the landing page on Vercel
 
-1. vercel.com → Add New → Project → import `VED2107/swiftdrop`. Leave *Root Directory* as the repo root; `vercel.json` sets install/build/output.
+1. vercel.com → Add New → Project → import `VED2107/swiftdrop` and pick **`apps/site`** (not `apps/web`: that's the app UI, which only works when served by SwiftDrop on the PC). `apps/site/vercel.json` sets install/build/output. Keep *Include files outside the Root Directory* on (the site reuses the app's design tokens).
 2. Environment variable `VITE_DOWNLOAD_URL` = the **public** URL of `SwiftDrop.exe`. The repo is private, so its release assets are not publicly downloadable: publish the exe somewhere public (a public releases repo, S3/R2, etc.) and point this at it.
 3. Deploy.
 

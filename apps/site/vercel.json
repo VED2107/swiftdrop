@@ -1,9 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
+  "framework": "vite",
   "installCommand": "npx pnpm@11.1.1 install --frozen-lockfile",
-  "buildCommand": "npx pnpm@11.1.1 --filter @swiftdrop/site build",
-  "outputDirectory": "apps/site/dist",
+  "buildCommand": "npx pnpm@11.1.1 run build",
+  "outputDirectory": "dist",
   "headers": [
     {
       "source": "/(.*)",

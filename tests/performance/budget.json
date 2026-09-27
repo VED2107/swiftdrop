@@ -1,0 +1,9 @@
+{
+  "sink:A": { "minMBs": 300, "maxReceiverRssMB": 400 },
+  "sink:B": { "minMBs": 380, "maxReceiverRssMB": 400 },
+  "sink:F": { "minMBs": 200, "maxReceiverRssMB": 400 },
+  "sink:G": { "minMBs": 180, "minFilesPerSec": 3500, "maxReceiverRssMB": 500 },
+  "sink:H": { "minMBs": 340, "maxReceiverRssMB": 500 },
+  "disk:B": { "minMBs": 350 },
+  "disk:G": { "minFilesPerSec": 1200 }
+}

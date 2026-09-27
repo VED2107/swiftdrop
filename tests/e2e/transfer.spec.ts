@@ -17,7 +17,7 @@ test("phone pairs by QR, PC approves, phone sends files that land byte-identical
 
   const host = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
   await host.goto(BASE_HOST);
-  await expect(host.getByText("Scan with your phone’s camera")).toBeVisible();
+  await expect(host.getByText("Scan the code with your phone’s camera")).toBeVisible();
   const pairing = (await (await host.request.get(`${BASE_HOST}/api/host/pairing`)).json()) as { url: string };
 
   const phone = await (await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: IPHONE_UA, isMobile: true, hasTouch: true })).newPage();

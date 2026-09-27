@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Api, type Pairing } from "../lib/api.ts";
 import { fromInput, type Picked } from "../lib/files.ts";
@@ -193,6 +193,7 @@ function Pairing({ phone, connecting }: { phone: string; connecting: boolean }) 
   const [expired, setExpired] = useState(false);
   const { joinRequests } = useAppState();
   const req = joinRequests[0];
+  useTick(1000, Boolean(p) && !connecting);
 
   const load = useCallback(async (rotate = false) => {
     try {
@@ -213,26 +214,24 @@ function Pairing({ phone, connecting }: { phone: string; connecting: boolean }) 
 
   const noNetwork = p && !p.url;
   const host = p?.manualUrl?.replace(/^http:\/\//, "");
+  const left = p ? Math.max(0, Math.round((p.expiresAt - Date.now()) / 1000)) : 0;
 
   return (
-    <div className="flex flex-col items-center gap-10">
-      <div className="flex flex-col items-center gap-4 max-w-[640px]">
-        <h1 className="t-display rise">{connecting ? "Almost there." : "Transfer without the cloud."}</h1>
-        <p className="t-lead rise" style={{ "--i": 1 } as React.CSSProperties}>
-          {connecting ? `Allow ${req?.deviceName ?? phone} to connect to this PC.` : "Your files move directly between your devices, over your own Wi-Fi."}
-        </p>
-      </div>
+    <div className="flex flex-col items-center gap-14">
+      <div className="pair">
+        <div className="pair-copy">
+          <h1 className="t-display rise">{connecting ? "Almost there." : "Connect your phone."}</h1>
+          <p className="t-lead rise" style={{ "--i": 1 } as React.CSSProperties}>
+            {connecting ? `Allow ${req?.deviceName ?? phone} to connect to this PC.` : "Files move directly between your devices, over your own Wi-Fi."}
+          </p>
 
-      {noNetwork ? (
-        <div className="max-w-md flex flex-col gap-2">
-          <p className="t-h2">This PC isn't on a network yet</p>
-          <p className="t-body">Join the same Wi-Fi as your phone, or turn on your phone's hotspot and connect this PC to it.</p>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-6 rise" style={{ "--i": 2 } as React.CSSProperties}>
-          <QrObject pairing={p} state={connecting ? "connecting" : expired ? "expired" : "idle"} onRefresh={() => void load(true)} />
-          {connecting && req ? (
-            <div className="flex flex-col items-center gap-4 swap-enter">
+          {noNetwork ? (
+            <div className="flex flex-col gap-2 rise" style={{ "--i": 2 } as React.CSSProperties}>
+              <p className="t-h2">This PC isn't on a network yet</p>
+              <p className="t-body">Join the same Wi-Fi as your phone, or turn on your phone's hotspot and connect this PC to it.</p>
+            </div>
+          ) : connecting && req ? (
+            <div className="pair-approve swap-enter">
               <p className="t-body" style={{ color: "var(--text)" }}>
                 {req.deviceName} wants to connect
               </p>
@@ -247,24 +246,49 @@ function Pairing({ phone, connecting }: { phone: string; connecting: boolean }) 
               <p className="t-small">Only allow a device you're holding.</p>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-2">
-              <p className="t-body" style={{ color: "var(--text)" }}>
-                Scan with your phone’s camera
-              </p>
-              {host && p && (
-                <p className="t-small">
-                  or open <span className="mono" style={{ color: "var(--text-2)" }}>{host}</span> and enter{" "}
-                  <span className="mono num" style={{ color: "var(--text)", letterSpacing: "0.12em" }}>
-                    {p.code}
+            <>
+              <ol className="pair-steps rise" style={{ "--i": 2 } as React.CSSProperties}>
+                <li>
+                  <span className="pair-step-n num" aria-hidden>1</span>
+                  <span>
+                    <span className="pair-step-t">Scan the code with your phone’s camera</span>
+                    <span className="t-small">Same Wi-Fi as this PC, or your phone’s hotspot.</span>
                   </span>
-                </p>
+                </li>
+                <li>
+                  <span className="pair-step-n num" aria-hidden>2</span>
+                  <span>
+                    <span className="pair-step-t">Tap Allow here when it asks</span>
+                    <span className="t-small">Nothing connects without your say-so.</span>
+                  </span>
+                </li>
+              </ol>
+              {host && p && (
+                <div className="pair-manual rise" style={{ "--i": 3 } as React.CSSProperties}>
+                  <div className="pair-manual-row">
+                    <span className="t-small">No camera? On the phone, open</span>
+                    <CopyText text={host} label="Copy address" />
+                  </div>
+                  <div className="pair-manual-row">
+                    <span className="t-small">and type</span>
+                    <CodeCells code={p.code} />
+                  </div>
+                  <p className="t-micro num" style={{ color: "var(--text-3)" }}>
+                    {expired ? "Code expired" : `New code in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`}
+                  </p>
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
-      )}
+        {!noNetwork && (
+          <div className="pair-qr rise" style={{ "--i": 1 } as React.CSSProperties}>
+            <QrObject pairing={p} state={connecting ? "connecting" : expired ? "expired" : "idle"} onRefresh={() => void load(true)} />
+          </div>
+        )}
+      </div>
 
-      <div className="w-full max-w-[460px] rise" style={{ "--i": 3 } as React.CSSProperties}>
+      <div className="w-full max-w-[460px] rise" style={{ "--i": 4 } as React.CSSProperties}>
         <Connection
           state={connecting ? "connecting" : "waiting"}
           left={{ name: connecting ? (req?.deviceName ?? "Phone") : "Phone", kind: "phone", live: connecting }}
@@ -279,5 +303,47 @@ function Pairing({ phone, connecting }: { phone: string; connecting: boolean }) 
         />
       </div>
     </div>
+  );
+}
+
+/** The six characters as separate cells: easier to read across a desk, re-staggers when the code rotates. */
+function CodeCells({ code }: { code: string }) {
+  return (
+    <span className="code-cells" role="text" aria-label={`Code ${code.split("").join(" ")}`}>
+      {code.split("").map((c, i) => (
+        <span key={`${code}-${i}`} className="code-cell" style={{ "--i": i } as React.CSSProperties} aria-hidden>
+          {c}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function CopyText({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 1400);
+    return () => clearTimeout(t);
+  }, [copied]);
+  return (
+    <button
+      type="button"
+      className="copy-field"
+      data-copied={copied}
+      aria-label={copied ? "Copied" : `${label}: ${text}`}
+      onClick={() =>
+        void navigator.clipboard
+          ?.writeText(text)
+          .then(() => setCopied(true))
+          .catch(() => notify("Couldn't copy. Select the address and copy it by hand.", "error"))
+      }
+    >
+      <span className="mono">{text}</span>
+      <span className="icon-swap" aria-hidden>
+        <Copy size={14} strokeWidth={1.75} className="icon-a" />
+        <Check size={14} strokeWidth={2.25} className="icon-b" />
+      </span>
+    </button>
   );
 }

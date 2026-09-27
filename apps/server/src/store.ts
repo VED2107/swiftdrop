@@ -14,7 +14,7 @@ import {
   type Offer,
   type TransferStatus,
 } from "@swiftdrop/protocol";
-import { Bitset, numberedName, sanitizeFileName, sanitizeRelativeDir, type Logger } from "@swiftdrop/shared";
+import { Bitset, numberedName, Reservoir, sanitizeFileName, sanitizeRelativeDir, type Logger } from "@swiftdrop/shared";
 import type { z } from "zod";
 import type { CreateTransferSchema } from "@swiftdrop/protocol";
 
@@ -112,6 +112,21 @@ export interface StoreOptions {
   hooks: StoreHooks;
 }
 
+/** Receiver pipeline counters (cumulative). Readers take deltas. */
+export interface PipelineMetrics {
+  requests: number;
+  bytes: number;
+  /** request body arriving from the socket (wire time as the receiver sees it) */
+  recvMs: number;
+  hashMs: number;
+  writeMs: number;
+  filesCreated: number;
+  queueBytes: number;
+  peakQueueBytes: number;
+  writeLatencyP50: number;
+  writeLatencyP95: number;
+}
+
 const STATE_DIR = ".swiftdrop";
 const WRITE_PRESSURE_BYTES = 96 << 20;
 const MAX_OPEN_HANDLES = 48;
@@ -123,12 +138,35 @@ export class TransferStore {
   private readonly persistTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private namingLock: Promise<unknown> = Promise.resolve();
   private pendingWriteBytes = 0;
+  private readonly m = { requests: 0, bytes: 0, recvMs: 0, hashMs: 0, writeMs: 0, filesCreated: 0, peakQueueBytes: 0 };
+  private readonly writeLatency = new Reservoir(512);
 
   constructor(private readonly opts: StoreOptions) {}
 
   /** 0..1 — how far behind the disk is. Sent to senders as a backpressure hint. */
   get load(): number {
     return Math.min(1, this.pendingWriteBytes / WRITE_PRESSURE_BYTES);
+  }
+
+  metrics(): PipelineMetrics {
+    return {
+      ...this.m,
+      queueBytes: this.pendingWriteBytes,
+      writeLatencyP50: this.writeLatency.percentile(50),
+      writeLatencyP95: this.writeLatency.percentile(95),
+    };
+  }
+
+  /** Time the route spent pulling a body off the socket. */
+  noteReceive(bytes: number, ms: number) {
+    this.m.requests++;
+    this.m.bytes += bytes;
+    this.m.recvMs += ms;
+  }
+
+  private queue(bytes: number) {
+    this.pendingWriteBytes += bytes;
+    if (this.pendingWriteBytes > this.m.peakQueueBytes) this.m.peakQueueBytes = this.pendingWriteBytes;
   }
 
   async create(input: CreateInput, device: { id: string; name: string }): Promise<{ status: TransferStatus } | { conflicts: Conflict[] }> {
@@ -250,11 +288,14 @@ export class TransferStore {
     const len = HASH_LENGTH[t.integrity];
     const claimed = hashesB64 ? safeB64(hashesB64) : null;
     if (!claimed || claimed.length !== count * len) throw new ProtocolError("BAD_REQUEST", "missing block hashes");
+    let t0 = performance.now();
     const actual = hasher.hashBlocks(body, BLOCK_SIZE);
+    this.m.hashMs += performance.now() - t0;
     if (!Buffer.from(actual).equals(Buffer.from(claimed))) throw new ProtocolError("INTEGRITY");
 
     if (!t.bench) {
-      this.pendingWriteBytes += body.length;
+      this.queue(body.length);
+      t0 = performance.now();
       const h = await this.handle(t, f);
       h.busy++;
       try {
@@ -269,6 +310,9 @@ export class TransferStore {
       } finally {
         h.busy--;
         this.pendingWriteBytes -= body.length;
+        const ms = performance.now() - t0;
+        this.m.writeMs += ms;
+        this.writeLatency.add(ms);
       }
     }
 
@@ -288,6 +332,7 @@ export class TransferStore {
     // Verify the whole frame before touching disk: a bad frame writes nothing.
     const work: Array<{ f: FileRec; data: Buffer; digest: Uint8Array }> = [];
     let offset = 0;
+    const h0 = performance.now();
     for (const entry of header.files) {
       const f = t.byId.get(entry.id);
       const data = payload.subarray(offset, offset + entry.size) as Buffer;
@@ -299,9 +344,11 @@ export class TransferStore {
       if (bytesToBase64Url(digest) !== entry.hash) throw new ProtocolError("INTEGRITY");
       work.push({ f, data, digest });
     }
+    this.m.hashMs += performance.now() - h0;
     if (!t.bench) {
       const bytes = work.reduce((n, w) => n + w.data.length, 0);
-      this.pendingWriteBytes += bytes;
+      this.queue(bytes);
+      const w0 = performance.now();
       try {
         // File creation latency (NTFS, antivirus) dominates small files: overlap it.
         await forEachLimit(work, 16, async ({ f, data }) => {
@@ -317,6 +364,10 @@ export class TransferStore {
         throw diskError(err);
       } finally {
         this.pendingWriteBytes -= bytes;
+        const ms = performance.now() - w0;
+        this.m.writeMs += ms;
+        this.writeLatency.add(ms);
+        this.m.filesCreated += work.length;
       }
     }
     for (const { f, digest } of work) {

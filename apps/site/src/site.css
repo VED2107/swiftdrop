@@ -82,3 +82,87 @@
     animation: swap-in var(--d-ui) var(--ease-out) both;
   }
 }
+
+@layer components {
+  .hero-title {
+    font-size: clamp(2.75rem, 1.6rem + 5vw, 5.25rem);
+    text-wrap: balance;
+  }
+  /* the hero link is the product's one authored moment: give it room */
+  .hero-link .device-glyph {
+    width: 60px;
+    height: 60px;
+    border-radius: 18px;
+  }
+  .hero-link .device-glyph svg {
+    width: 26px;
+    height: 26px;
+  }
+  .feature-icon {
+    color: var(--accent);
+    margin-bottom: var(--s-2);
+  }
+  .feature .t-body,
+  .step .t-body {
+    color: var(--text-2);
+  }
+  .spec {
+    display: grid;
+    grid-template-columns: 1fr;
+    margin: 0;
+    border-radius: var(--r-l);
+    background: var(--surface);
+    box-shadow: var(--sh-hair);
+    overflow: hidden;
+  }
+  @media (min-width: 520px) {
+    .spec {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (min-width: 820px) {
+    .spec {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  .spec > div {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    padding: var(--s-5) var(--s-6);
+    box-shadow: inset -1px -1px 0 var(--hairline);
+  }
+  .spec dt {
+    font-size: var(--t-micro);
+    color: var(--text-3);
+  }
+  .spec dd {
+    margin: 0;
+    color: var(--text);
+  }
+
+  /* FAQ: height eases open instead of jumping (Chromium; others open instantly) */
+  .faq details {
+    interpolate-size: allow-keywords;
+  }
+  .faq details::details-content {
+    height: 0;
+    overflow: clip;
+    transition:
+      height var(--d-ui) var(--ease-out),
+      content-visibility var(--d-ui) allow-discrete;
+  }
+  .faq details[open]::details-content {
+    height: auto;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .faq summary:hover::after {
+      color: var(--text);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .faq details::details-content {
+      transition: none;
+    }
+  }
+}

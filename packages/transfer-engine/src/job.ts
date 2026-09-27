@@ -10,10 +10,11 @@ import {
   type ErrorCode,
   type TransferStatus,
 } from "@swiftdrop/protocol";
-import { Bitset } from "@swiftdrop/shared";
+import { Bitset, Reservoir } from "@swiftdrop/shared";
 import { AdaptiveController, DESKTOP_CONTROLLER, type ControllerConfig, type ControllerReason } from "./controller.ts";
 import { Planner, type PlanFile, type WorkItem } from "./planner.ts";
 import { SpeedMeter } from "./speed-meter.ts";
+import { emptyStages, type Telemetry } from "./telemetry.ts";
 import { TransportError, type Transport } from "./transport.ts";
 
 export interface SourceFile {
@@ -91,6 +92,8 @@ interface Flight {
   item: WorkItem;
   ac: AbortController;
   startedAt: number;
+  /** payload bytes this request carries (for the in-flight window) */
+  bytes: number;
   /** set when we aborted it on purpose (pause/cancel/reconnect) */
   intentional: boolean;
 }
@@ -128,6 +131,16 @@ export class TransferJob {
   private readonly hashes = new Map<number, HashStore>();
   private readonly listeners = new Set<(job: TransferJob) => void>();
   private hasher: BlockHasher | null = null;
+
+  // telemetry
+  private readonly stages = emptyStages();
+  private readonly tputSamples = new Reservoir(600);
+  private readonly latencies = new Reservoir(512);
+  private requests = 0;
+  private prepareMs = 0;
+  private wireBytes = 0;
+  private inflightBytes = 0;
+  private peakInflightBytes = 0;
 
   private _state: JobState = "queued";
   private errorCode: ErrorCode | null = null;
@@ -189,8 +202,10 @@ export class TransferJob {
     if (this._state !== "queued") return;
     this.setState("preparing");
     try {
+      const t0 = this.now();
       this.hasher = await createBlockHasher(this.opts.integrity ?? "xxh64");
       const status = await this.negotiate();
+      this.prepareMs = this.now() - t0;
       if (!status) return;
       this.adopt(status);
       this.run();
@@ -289,6 +304,23 @@ export class TransferJob {
     return { state: f.state, bytes: this.planner.ackedBytes(f), ...(f.finalName ? { finalName: f.finalName } : {}) };
   }
 
+  /** Where time and bytes go. Cheap; the dev performance panel polls it. */
+  telemetry(): Telemetry {
+    return {
+      stages: { ...this.stages },
+      prepareMs: this.prepareMs,
+      requests: this.requests,
+      payloadBytes: this.bytesDone,
+      wireBytes: this.wireBytes,
+      inflightBytes: this.inflightBytes,
+      peakInflightBytes: this.peakInflightBytes,
+      throughputP50: this.tputSamples.percentile(50),
+      throughputP95: this.tputSamples.percentile(95),
+      latencyP50: this.latencies.percentile(50),
+      latencyP95: this.latencies.percentile(95),
+    };
+  }
+
   // -------------------------------------------------------------------------
 
   private async negotiate(): Promise<TransferStatus | null> {
@@ -355,12 +387,16 @@ export class TransferJob {
   }
 
   private launch(item: WorkItem) {
-    const flight: Flight = { item, ac: new AbortController(), startedAt: this.now(), intentional: false };
+    const bytes = itemBytes(item, this.files);
+    const flight: Flight = { item, ac: new AbortController(), startedAt: this.now(), bytes, intentional: false };
     this.flights.add(flight);
+    this.inflightBytes += bytes;
+    if (this.inflightBytes > this.peakInflightBytes) this.peakInflightBytes = this.inflightBytes;
     this.execute(flight)
       .catch((err: unknown) => this.onFlightError(flight, err))
       .finally(() => {
         this.flights.delete(flight);
+        this.inflightBytes -= flight.bytes;
         this.pump();
       });
   }
@@ -368,37 +404,57 @@ export class TransferJob {
   private async execute(flight: Flight): Promise<void> {
     const { item } = flight;
     const hasher = this.hasher!;
+    const st = this.stages;
     if (item.kind === "complete") {
+      const t0 = this.now();
       await this.completeFile(item);
+      st.completeMs += this.now() - t0;
       return;
     }
     if (item.kind === "blocks") {
       const src = this.files[item.file.index]!;
       const from = item.start * BLOCK_SIZE;
       const to = Math.min(src.size, (item.start + item.count) * BLOCK_SIZE);
+      let t = this.now();
       const body = new Uint8Array(await src.blob.slice(from, to).arrayBuffer());
       if (flight.ac.signal.aborted) throw new TransportError("CANCELLED");
+      let t2 = this.now();
+      st.readMs += t2 - t;
       const digests = hasher.hashBlocks(body, BLOCK_SIZE);
       this.storeHashes(item.file, item.start, digests);
-      const sentAt = this.now();
-      const { load } = await this.transport.putBlocks(this.id, item.file.id, item.start, body, bytesToBase64Url(digests), flight.ac.signal);
-      this.recordSuccess(body.byteLength, this.now() - sentAt, load);
+      const hashes = bytesToBase64Url(digests);
+      t = this.now();
+      st.hashMs += t - t2;
+      const { load } = await this.transport.putBlocks(this.id, item.file.id, item.start, body, hashes, flight.ac.signal);
+      t2 = this.now();
+      st.networkMs += t2 - t;
+      this.wireBytes += body.byteLength + hashes.length;
+      this.recordSuccess(body.byteLength, t2 - t, load);
       this.planner.ack(item);
       return;
     }
 
+    let t = this.now();
     const buffers = await Promise.all(item.files.map((f) => this.files[f.index]!.blob.arrayBuffer()));
     if (flight.ac.signal.aborted) throw new TransportError("CANCELLED");
-    const header = encodeBatchHeader({
-      files: item.files.map((f, i) => ({
-        id: f.id,
-        size: buffers[i]!.byteLength,
-        hash: bytesToBase64Url(hasher.hashBlocks(new Uint8Array(buffers[i]!), BLOCK_SIZE)),
-      })),
-    });
-    const sentAt = this.now();
-    const { load } = await this.transport.putBatch(this.id, new Blob([header, ...buffers]), flight.ac.signal);
-    this.recordSuccess(item.bytes, this.now() - sentAt, load);
+    let t2 = this.now();
+    st.readMs += t2 - t;
+    const entries = item.files.map((f, i) => ({
+      id: f.id,
+      size: buffers[i]!.byteLength,
+      hash: bytesToBase64Url(hasher.hashBlocks(new Uint8Array(buffers[i]!), BLOCK_SIZE)),
+    }));
+    t = this.now();
+    st.hashMs += t - t2;
+    const header = encodeBatchHeader({ files: entries });
+    const frame = new Blob([header, ...buffers]);
+    t2 = this.now();
+    st.frameMs += t2 - t;
+    const { load } = await this.transport.putBatch(this.id, frame, flight.ac.signal);
+    t = this.now();
+    st.networkMs += t - t2;
+    this.wireBytes += frame.size;
+    this.recordSuccess(item.bytes, t - t2, load);
     this.planner.ack(item);
     this.filesDone += item.files.length;
     this.fileMeter.add(item.files.length);
@@ -412,6 +468,8 @@ export class TransferJob {
     this.sampleLatencyCount++;
     this.sampleLoad = Math.max(this.sampleLoad, load);
     this.consecutiveServerErrors = 0;
+    this.requests++;
+    this.latencies.add(latency);
   }
 
   private storeHashes(f: PlanFile, start: number, digests: Uint8Array) {
@@ -630,8 +688,10 @@ export class TransferJob {
     const t = this.now();
     const dt = Math.max(1, t - this.sampleStart);
     const before = this.controller.streams;
+    const throughput = (this.sampleBytes * 1000) / dt;
+    if (throughput > 0) this.tputSamples.add(throughput);
     const decision = this.controller.update({
-      throughput: (this.sampleBytes * 1000) / dt,
+      throughput,
       avgLatencyMs: this.sampleLatencyCount ? this.sampleLatencySum / this.sampleLatencyCount : 0,
       errors: this.sampleErrors,
       serverLoad: this.sampleLoad,
@@ -689,6 +749,13 @@ export class TransferJob {
   private emit() {
     for (const fn of this.listeners) fn(this);
   }
+}
+
+function itemBytes(item: WorkItem, files: SourceFile[]): number {
+  if (item.kind === "batch") return item.bytes;
+  if (item.kind === "complete") return 0;
+  const size = files[item.file.index]!.size;
+  return Math.min(size, (item.start + item.count) * BLOCK_SIZE) - item.start * BLOCK_SIZE;
 }
 
 function sleep(ms: number): Promise<void> {

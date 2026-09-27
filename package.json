@@ -17,7 +17,11 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "bench": "tsx tests/performance/bench.ts",
-    "build:exe": "node scripts/build-exe.mjs"
+    "build:exe": "node scripts/build-exe.mjs",
+    "bench:disk": "tsx tests/performance/disk-bench.ts",
+    "bench:browser": "tsx tests/performance/browser-bench.ts",
+    "bench:primitives": "tsx tests/performance/primitives.ts",
+    "bench:check": "tsx tests/performance/bench.ts --check"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

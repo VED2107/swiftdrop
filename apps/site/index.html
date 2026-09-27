@@ -29,8 +29,7 @@
       <!-- hero -->
       <section class="flex flex-col items-center text-center gap-10 pt-16 md:pt-28 pb-24">
         <div class="flex flex-col items-center gap-5 max-w-[760px]">
-          <p class="pill rise"><span class="dot" data-state="live"></span>For iPhone, Android and Windows</p>
-          <h1 class="t-display rise" style="--i: 1; font-size: clamp(2.75rem, 1.6rem + 5vw, 5.25rem)">Transfer without the cloud.</h1>
+          <h1 class="t-display hero-title rise">Transfer without the cloud.</h1>
           <p class="t-lead rise max-w-[560px]" style="--i: 2">Move photos, videos and files between your phone and your PC — directly over your own Wi-Fi. Scan once, drop anything, done.</p>
         </div>
         <div class="flex flex-col items-center gap-3 rise" style="--i: 3">
@@ -41,11 +40,11 @@
             </a>
             <a class="btn btn-ghost btn-lg" href="#how">How it works</a>
           </div>
-          <p class="t-small" data-platform-note>Free · Windows 10 or 11 · Nothing to install on your phone</p>
+          <p class="t-small" data-platform-note>Free · Windows 10 or 11 · Works with iPhone and Android, nothing to install on the phone</p>
         </div>
 
         <!-- the product's pulse: a live-looking link, phone → PC -->
-        <div class="w-full max-w-[640px] mt-8 rise" style="--i: 4">
+        <div class="hero-link w-full max-w-[760px] mt-10 rise" style="--i: 4">
           <div class="link" data-flow="right" style="--track-w: 460px; --flow-dur: 0.95s; --pw: 22px">
             <div class="device" data-live="true">
               <div class="device-glyph"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5" /><path d="M11 18h2" /></svg></div>
@@ -74,7 +73,7 @@
           <ol class="list-none m-0 p-0">
             <li class="step">
               <span class="step-n num">1</span>
-              <div><h3 class="t-h2">Open SwiftDrop on your PC</h3><p class="t-body mt-1">Run SwiftDrop.exe. A code appears in your browser.</p></div>
+              <div><h3 class="t-h2">Open SwiftDrop on your PC</h3><p class="t-body mt-1">Run SwiftDrop.exe. Its window shows a code to scan.</p></div>
             </li>
             <li class="step">
               <span class="step-n num">2</span>
@@ -91,11 +90,24 @@
       <!-- why -->
       <section class="py-24" aria-label="Why SwiftDrop">
         <div class="grid gap-x-20 gap-y-14 md:grid-cols-2">
-          <div class="feature"><h3 class="t-h2">Nothing leaves your network</h3><p class="t-body">Files travel from one device to the other over your own Wi-Fi. There's no upload, no server in between, and it works without internet.</p></div>
-          <div class="feature"><h3 class="t-h2">As fast as your Wi-Fi</h3><p class="t-body">Transfers run over several parallel connections that adapt to your network, so big videos and thousand-photo batches move at the speed your router allows.</p></div>
-          <div class="feature"><h3 class="t-h2">Picks up where it stopped</h3><p class="t-body">Lose Wi-Fi halfway through a 10 GB video? SwiftDrop resumes from the last piece, never from zero, and checks every piece arrived intact.</p></div>
-          <div class="feature"><h3 class="t-h2">Straight into your folder</h3><p class="t-body">No "download each file" prompts on the PC. Everything lands in the folder you choose, with folders kept intact.</p></div>
+          <div class="feature"><svg class="feature-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><path d="M12 19.5h.01"/><path d="M2 9a14.5 14.5 0 0 1 20 0"/></svg><h3 class="t-h2">Nothing leaves your network</h3><p class="t-body">Files travel from one device to the other over your own Wi-Fi. There's no upload, no server in between, and it works without internet.</p></div>
+          <div class="feature"><svg class="feature-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg><h3 class="t-h2">As fast as your Wi-Fi</h3><p class="t-body">Transfers run over several parallel connections that adapt to your network, so big videos and thousand-photo batches move at the speed your router allows.</p></div>
+          <div class="feature"><svg class="feature-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/></svg><h3 class="t-h2">Picks up where it stopped</h3><p class="t-body">Lose Wi-Fi halfway through a 10 GB video? SwiftDrop resumes from the last piece, never from zero, and checks every piece arrived intact.</p></div>
+          <div class="feature"><svg class="feature-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m9 13 2 2 4-4"/></svg><h3 class="t-h2">Straight into your folder</h3><p class="t-body">No "download each file" prompts on the PC. Everything lands in the folder you choose, with folders kept intact.</p></div>
         </div>
+      </section>
+
+      <!-- under the hood: facts from the code, no speed claims -->
+      <section class="py-16" aria-labelledby="spec-title">
+        <h2 id="spec-title" class="t-h2 mb-6">Under the hood</h2>
+        <dl class="spec">
+          <div><dt>Connection</dt><dd>Phone to PC directly, over your LAN</dd></div>
+          <div><dt>Parallel streams</dt><dd class="num">Up to 6, tuned live</dd></div>
+          <div><dt>Integrity check</dt><dd>Every 1 MiB block hashed on both ends</dd></div>
+          <div><dt>Resume</dt><dd>From the last verified block</dd></div>
+          <div><dt>Pairing</dt><dd>One-time code, expires in 5 minutes</dd></div>
+          <div><dt>Account</dt><dd>None</dd></div>
+        </dl>
       </section>
 
       <!-- privacy -->

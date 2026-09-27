@@ -1,151 +1,220 @@
 /**
- * Loopback benchmark: the real engine against the real server, same process.
+ * Engine benchmark: the real engine (this process) -> the real server (child process) over loopback.
  *
- *   pnpm bench                 # 100 MB, 1 GB, 1,000 and 10,000 small files
- *   pnpm bench --large         # adds 5 GB and 10 GB
- *   pnpm bench --disk          # write to disk instead of the verify-only sink
- *   pnpm bench --sha256        # cryptographic block digests instead of xxh64
+ *   pnpm bench                     A, B, E, F, G, H into the verify-only sink
+ *   pnpm bench --disk              receiver writes to disk (tmp dir on the system drive)
+ *   pnpm bench --large             adds C (5 GB), D (10 GB) and 50,000 x 10 KB
+ *   pnpm bench --only=B,G          run a subset
+ *   pnpm bench --sha256            cryptographic block digests instead of xxh64
+ *   pnpm bench --sweep             fixed streams x chunk grid on 1 GB (finds the ceiling)
+ *   pnpm bench --tag=name          label stored with the results
+ *   pnpm bench --check             compare to tests/performance/budget.json, exit 1 on regression
  *
- * Loopback has no Wi-Fi in the way, so these numbers are the software ceiling:
- * what the engine + server can push when the network is not the bottleneck.
+ * Loopback has no Wi-Fi in the way: these numbers are the SOFTWARE ceiling (engine + server +
+ * disk), not what a phone gets. Real-LAN numbers come from the in-app bench (/#/bench) and are
+ * recorded by hand in PERFORMANCE_REPORT.md with the network they were taken on.
  */
-import { openAsBlob } from "node:fs";
-import { mkdir, mkdtemp, open, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { BLOCK_SIZE } from "@swiftdrop/protocol";
-import { formatBytes, formatDuration, setLogLevel } from "@swiftdrop/shared";
-import { HttpTransport, TransferJob, type SourceFile } from "@swiftdrop/transfer-engine";
-import { createApp } from "../../apps/server/src/app.ts";
+import { formatBytes, setLogLevel } from "@swiftdrop/shared";
+import { DESKTOP_CONTROLLER, HttpTransport, TransferJob, type ControllerConfig, type SourceFile } from "@swiftdrop/transfer-engine";
+import { diskBlob, gitRev, makeSource, MB, MiB, startServer, type LabServer } from "./lab.ts";
 
 setLogLevel("warn");
-const args = new Set(process.argv.slice(2));
-const toDisk = args.has("--disk");
-const integrity = args.has("--sha256") ? "sha256" : "xxh64";
+const argv = process.argv.slice(2);
+const flag = (f: string) => argv.includes(f);
+const opt = (k: string) => argv.find((a) => a.startsWith(`--${k}=`))?.split("=")[1];
+const toDisk = flag("--disk");
+const integrity = flag("--sha256") ? "sha256" : "xxh64";
+const only = opt("only")?.split(",");
+const tag = opt("tag") ?? "";
 
-interface Scenario {
-  name: string;
-  files: () => SourceFile[];
-}
-
-// Inputs are slices of one file-backed Blob, like a browser File: nothing is held in RAM,
-// so the RSS column measures the engine + server, not the test data.
-const SOURCE_BYTES = 1024 * BLOCK_SIZE;
-const sourceDir = await mkdtemp(join(tmpdir(), "swiftdrop-src-"));
-const sourcePath = join(sourceDir, "source.bin");
-{
-  const fh = await open(sourcePath, "w");
-  const chunk = new Uint8Array(BLOCK_SIZE);
-  for (let b = 0; b < SOURCE_BYTES / BLOCK_SIZE; b++) {
-    for (let i = 0; i < chunk.length; i += 4) chunk[i] = (b * 131 + i * 2654435761) >>> 24;
-    await fh.write(chunk);
-  }
-  await fh.close();
-}
-const sourceBlob = await openAsBlob(sourcePath);
-
+const SOURCE_BYTES = 256 * MiB;
+const src = await makeSource(SOURCE_BYTES);
 let n = 0;
 let cursor = 0;
-function file(size: number, name: string): SourceFile {
-  const parts: Blob[] = [];
-  for (let left = size; left > 0; ) {
-    if (cursor >= SOURCE_BYTES) cursor = 0;
-    const take = Math.min(left, SOURCE_BYTES - cursor);
-    parts.push(sourceBlob.slice(cursor, cursor + take));
-    cursor += take;
-    left -= take;
-  }
-  return { id: `file_${String(++n).padStart(7, "0")}`, name, relDir: "bench", size, type: "application/octet-stream", lastModified: Date.now(), blob: parts.length === 1 ? parts[0]! : new Blob(parts) };
+function file(size: number, name: string, dir = "bench"): SourceFile {
+  const from = cursor;
+  cursor = (cursor + size) % SOURCE_BYTES;
+  return { id: `file_${String(++n).padStart(7, "0")}`, name, relDir: dir, size, type: "application/octet-stream", lastModified: Date.now(), blob: diskBlob(src.fh, SOURCE_BYTES, from, from + size) };
 }
+const many = (count: number, size: number, prefix: string, ext: string) => Array.from({ length: count }, (_, i) => file(size, `${prefix}_${i}.${ext}`));
 
-const MB = 1e6;
+interface Scenario {
+  id: string;
+  name: string;
+  large?: boolean;
+  files: () => SourceFile[];
+}
 const scenarios: Scenario[] = [
-  { name: "100 MB file", files: () => [file(100 * MB, "100mb.bin")] },
-  { name: "1 GB file", files: () => [file(1000 * MB, "1gb.bin")] },
-  { name: "1,000 photos (3 MB)", files: () => Array.from({ length: 1000 }, (_, i) => file(3 * MB, `IMG_${i}.HEIC`)) },
-  { name: "1,000 small (200 KB)", files: () => Array.from({ length: 1000 }, (_, i) => file(200_000, `s_${i}.jpg`)) },
-  { name: "10,000 small (50 KB)", files: () => Array.from({ length: 10_000 }, (_, i) => file(50_000, `t_${i}.jpg`)) },
+  { id: "A", name: "100 MB file", files: () => [file(100 * MB, "100mb.bin")] },
+  { id: "B", name: "1 GB file", files: () => [file(1000 * MB, "1gb.bin")] },
+  { id: "C", name: "5 GB file", large: true, files: () => [file(5000 * MB, "5gb.bin")] },
+  { id: "D", name: "10 GB file", large: true, files: () => [file(10_000 * MB, "10gb.bin")] },
+  { id: "E", name: "1,000 x 10 KB", files: () => many(1000, 10_000, "e", "txt") },
+  { id: "F", name: "1,000 x 100 KB", files: () => many(1000, 100_000, "f", "jpg") },
+  { id: "G", name: "10,000 x 50 KB", files: () => many(10_000, 50_000, "g", "jpg") },
+  { id: "G2", name: "50,000 x 10 KB", large: true, files: () => many(50_000, 10_000, "g2", "txt") },
+  {
+    id: "H",
+    name: "mixed: photos+videos+PDFs",
+    files: () => [...many(300, 3 * MB, "IMG", "HEIC"), ...many(8, 60 * MB, "MOV", "MOV"), ...many(150, 400_000, "doc", "pdf")],
+  },
 ];
-if (args.has("--large")) {
-  scenarios.push({ name: "5 GB file", files: () => [file(5000 * MB, "5gb.bin")] });
-  scenarios.push({ name: "10 GB file", files: () => [file(10_000 * MB, "10gb.bin")] });
+
+interface Row {
+  id: string;
+  scenario: string;
+  state: string;
+  seconds: number;
+  MBs: number;
+  filesPerSec: number;
+  p50MBs: number;
+  p95MBs: number;
+  streams: number;
+  chunkMiB: number;
+  peakInflightMiB: number;
+  requests: number;
+  prepareMs: number;
+  latP50ms: number;
+  latP95ms: number;
+  retries: number;
+  senderCpuPct: number;
+  receiverCpuPct: number;
+  senderRssMB: number;
+  receiverRssMB: number;
+  /** % of summed sender stage time */
+  sRead: number;
+  sHash: number;
+  sFrame: number;
+  sNet: number;
+  sComplete: number;
+  /** receiver ms per GB */
+  rRecvMsPerGB: number;
+  rHashMsPerGB: number;
+  rWriteMsPerGB: number;
+  rPeakQueueMiB: number;
+  rWriteP95ms: number;
 }
 
-const root = await mkdtemp(join(tmpdir(), "swiftdrop-bench-"));
-const app = createApp({
-  port: 0,
-  bindAddress: "127.0.0.1",
-  destination: join(root, "dest"),
-  outboxDir: join(root, "outbox"),
-  stateDir: join(root, "state"),
-  webRoot: join(root, "none"),
-  maxFileSize: 1e13,
-  pairingTtlMs: 60_000,
-  deviceIdleTtlMs: 3600_000,
-  logLevel: "warn",
-  openBrowser: false,
-  isHostRequest: (req) => req.headers["x-bench-host"] === "1",
-});
-const port = await app.listen();
-const base = `http://127.0.0.1:${port}`;
-const token = await pair();
-const transport = new HttpTransport({ baseUrl: base, token });
-
-async function pair(): Promise<string> {
-  const host = { "x-bench-host": "1", "content-type": "application/json" };
-  const { code } = (await (await fetch(`${base}/api/host/pairing`, { headers: host })).json()) as { code: string };
-  const { requestId } = (await (
-    await fetch(`${base}/api/join`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code, deviceName: "bench" }) })
-  ).json()) as { requestId: string };
-  await fetch(`${base}/api/host/joins/${requestId}`, { method: "POST", headers: host, body: JSON.stringify({ approve: true }) });
-  return ((await (await fetch(`${base}/api/join/${requestId}`)).json()) as { token: string }).token;
-}
-
-const rows: Array<Record<string, string | number>> = [];
-console.log(`\nSwiftDrop loopback benchmark — sink: ${toDisk ? "disk" : "verify-only"}, integrity: ${integrity}\n`);
-
-for (const sc of scenarios) {
+async function runOne(server: LabServer, sc: Scenario, controller?: ControllerConfig): Promise<Row> {
   const files = sc.files();
-  const cpu0 = process.cpuUsage();
-  let peakRss = process.memoryUsage().rss;
-  const job = new TransferJob({ transport, files, direction: "to-host", label: sc.name, integrity, bench: !toDisk, onConflict: "replace" });
-  const t0 = performance.now();
-  let peak = 0;
-  const mem = setInterval(() => {
-    peakRss = Math.max(peakRss, process.memoryUsage().rss);
-    peak = Math.max(peak, job.snapshot().peak);
+  const transport = new HttpTransport({ baseUrl: server.base, token: server.token });
+  const job = new TransferJob({ transport, files, direction: "to-host", label: sc.name, integrity, bench: !toDisk, onConflict: "replace", ...(controller ? { controller } : {}) });
+  const s0 = await server.stats();
+  let senderRss = process.memoryUsage().rss;
+  let receiverRss = s0.rss;
+  const poll = setInterval(() => {
+    senderRss = Math.max(senderRss, process.memoryUsage().rss);
+    void server.stats().then((s) => (receiverRss = Math.max(receiverRss, s.rss)), () => undefined);
   }, 250);
+  const cpu0 = process.cpuUsage();
+  const t0 = performance.now();
   await job.start();
   await Promise.race([job.done, new Promise<void>((r) => job.onChange((j) => j.state === "paused" && r()))]);
-  clearInterval(mem);
   const secs = (performance.now() - t0) / 1000;
   const cpu = process.cpuUsage(cpu0);
+  clearInterval(poll);
+  const s1 = await server.stats();
   const s = job.snapshot();
-  const row = {
+  const tm = job.telemetry();
+  const st = tm.stages;
+  const stageSum = st.readMs + st.hashMs + st.frameMs + st.networkMs + st.completeMs || 1;
+  const gb = s.bytesTotal / 1e9 || 1;
+  const p0 = s0.pipeline;
+  const p1 = s1.pipeline;
+  const r = (v: number) => Math.round(v * 10) / 10;
+  return {
+    id: sc.id,
     scenario: sc.name,
     state: s.state,
-    avgMBs: +(s.bytesTotal / secs / MB).toFixed(1),
-    peakMBs: +(Math.max(peak, s.peak) / MB).toFixed(1),
-    duration: formatDuration(secs),
+    seconds: r(secs),
+    MBs: r(s.bytesTotal / secs / MB),
     filesPerSec: Math.round(s.filesTotal / secs),
+    p50MBs: r(tm.throughputP50 / MB),
+    p95MBs: r(tm.throughputP95 / MB),
     streams: s.streams,
-    chunk: formatBytes(s.chunkBytes),
-    cpuPct: +(((cpu.user + cpu.system) / 1e6 / secs) * 100).toFixed(0),
-    peakRss: formatBytes(peakRss),
+    chunkMiB: s.chunkBytes / MiB,
+    peakInflightMiB: r(tm.peakInflightBytes / MiB),
+    requests: tm.requests,
+    prepareMs: Math.round(tm.prepareMs),
+    latP50ms: r(tm.latencyP50),
+    latP95ms: r(tm.latencyP95),
     retries: s.retries,
-    chunkFailures: s.chunkFailures,
+    senderCpuPct: Math.round(((cpu.user + cpu.system) / 1e6 / secs) * 100),
+    receiverCpuPct: Math.round(((s1.cpuUserMs + s1.cpuSystemMs - s0.cpuUserMs - s0.cpuSystemMs) / 1000 / secs) * 100),
+    senderRssMB: Math.round(senderRss / MB),
+    receiverRssMB: Math.round(receiverRss / MB),
+    sRead: Math.round((st.readMs / stageSum) * 100),
+    sHash: Math.round((st.hashMs / stageSum) * 100),
+    sFrame: Math.round((st.frameMs / stageSum) * 100),
+    sNet: Math.round((st.networkMs / stageSum) * 100),
+    sComplete: Math.round((st.completeMs / stageSum) * 100),
+    rRecvMsPerGB: Math.round((p1.recvMs - p0.recvMs) / gb),
+    rHashMsPerGB: Math.round((p1.hashMs - p0.hashMs) / gb),
+    rWriteMsPerGB: Math.round((p1.writeMs - p0.writeMs) / gb),
+    rPeakQueueMiB: r(p1.peakQueueBytes / MiB),
+    rWriteP95ms: r(p1.writeLatencyP95),
   };
-  rows.push(row);
-  if (s.state !== "complete") console.log(`  ${sc.name}: ${s.state} ${s.errorCode ?? ""}`);
-  console.log(`  ${sc.name.padEnd(22)} ${String(row.avgMBs).padStart(7)} MB/s avg  ${String(row.peakMBs).padStart(7)} peak  ${row.duration}  ${row.streams}×${row.chunk}  cpu ${row.cpuPct}%  rss ${row.peakRss}`);
-  if (toDisk) await rm(join(root, "dest", "bench"), { recursive: true, force: true });
+}
+
+const threadpool = opt("threadpool");
+const server = await startServer(threadpool ? { env: { UV_THREADPOOL_SIZE: threadpool } } : {});
+const rows: Row[] = [];
+console.log(`\nSwiftDrop engine benchmark (${gitRev()}${tag ? `, ${tag}` : ""}) — receiver: ${toDisk ? "disk" : "verify-only sink"}, integrity: ${integrity}\n`);
+
+if (flag("--sweep")) {
+  const sc = scenarios.find((s) => s.id === "B")!;
+  for (const streams of [1, 2, 3, 4, 6, 8]) {
+    for (const blocks of [1, 2, 4, 8, 16]) {
+      const cfg: ControllerConfig = { ...DESKTOP_CONTROLLER, minStreams: streams, maxStreams: streams, initialStreams: streams, minBlocks: blocks, maxBlocks: blocks, initialBlocks: blocks, memoryBudget: 1 << 30 };
+      const row = await runOne(server, { ...sc, id: `B@${streams}x${blocks}` }, cfg);
+      rows.push(row);
+      console.log(`  ${streams} streams x ${String(blocks).padStart(2)} MiB  ${String(row.MBs).padStart(7)} MB/s  cpu s${row.senderCpuPct}% r${row.receiverCpuPct}%  lat p50 ${row.latP50ms} ms`);
+    }
+  }
+} else {
+  for (const sc of scenarios) {
+    if (only ? !only.includes(sc.id) : sc.large && !flag("--large")) continue;
+    const row = await runOne(server, sc);
+    rows.push(row);
+    if (row.state !== "complete") console.log(`  ${sc.name}: ${row.state}`);
+    console.log(
+      `  ${sc.id.padEnd(3)} ${sc.name.padEnd(26)} ${String(row.MBs).padStart(7)} MB/s  ${String(row.filesPerSec).padStart(6)} files/s  ${row.streams}x${row.chunkMiB}MiB  cpu s${row.senderCpuPct}% r${row.receiverCpuPct}%  rss s${row.senderRssMB} r${row.receiverRssMB} MB  prep ${row.prepareMs}ms  stages r${row.sRead}/h${row.sHash}/f${row.sFrame}/n${row.sNet}/c${row.sComplete}%`,
+    );
+    if (toDisk) await rm(join(server.dest, "bench"), { recursive: true, force: true });
+  }
 }
 
 console.log("");
-console.table(rows);
+console.table(rows.map(({ id, MBs, filesPerSec, p50MBs, p95MBs, streams, chunkMiB, peakInflightMiB, latP95ms, senderCpuPct, receiverCpuPct, senderRssMB, receiverRssMB, rWriteMsPerGB, rPeakQueueMiB }) => ({ id, MBs, filesPerSec, p50MBs, p95MBs, streams, chunkMiB, peakInflightMiB, latP95ms, senderCpuPct, receiverCpuPct, senderRssMB, receiverRssMB, rWriteMsPerGB, rPeakQueueMiB })));
+
 const outDir = join(import.meta.dirname, "results");
 await mkdir(outDir, { recursive: true });
-await writeFile(join(outDir, `bench-${toDisk ? "disk" : "sink"}-${integrity}.json`), JSON.stringify({ at: new Date().toISOString(), node: process.version, rows }, null, 2));
-await app.close();
-await rm(root, { recursive: true, force: true });
-await rm(sourceDir, { recursive: true, force: true });
+const name = `${flag("--sweep") ? "sweep" : "bench"}-${toDisk ? "disk" : "sink"}-${integrity}${tag ? `-${tag}` : ""}.json`;
+await writeFile(join(outDir, name), JSON.stringify({ at: new Date().toISOString(), rev: gitRev(), node: process.version, tag, rows }, null, 2));
+console.log(`saved results/${name}  (${formatBytes(SOURCE_BYTES)} source on disk)`);
+
+let failed = false;
+if (flag("--check")) {
+  const budget = JSON.parse(await readFile(join(import.meta.dirname, "budget.json"), "utf8")) as Record<string, { minMBs?: number; minFilesPerSec?: number; maxReceiverRssMB?: number; maxSenderRssMB?: number }>;
+  for (const row of rows) {
+    const b = budget[`${toDisk ? "disk" : "sink"}:${row.id}`];
+    if (!b) continue;
+    const problems: string[] = [];
+    if (row.state !== "complete") problems.push(`state ${row.state}`);
+    if (b.minMBs && row.MBs < b.minMBs) problems.push(`${row.MBs} MB/s < ${b.minMBs}`);
+    if (b.minFilesPerSec && row.filesPerSec < b.minFilesPerSec) problems.push(`${row.filesPerSec} files/s < ${b.minFilesPerSec}`);
+    if (b.maxReceiverRssMB && row.receiverRssMB > b.maxReceiverRssMB) problems.push(`receiver RSS ${row.receiverRssMB} MB > ${b.maxReceiverRssMB}`);
+    if (b.maxSenderRssMB && row.senderRssMB > b.maxSenderRssMB) problems.push(`sender RSS ${row.senderRssMB} MB > ${b.maxSenderRssMB}`);
+    if (problems.length) {
+      failed = true;
+      console.log(`  BUDGET ${row.id}: ${problems.join(", ")}`);
+    }
+  }
+  console.log(failed ? "performance budget: FAILED" : "performance budget: ok");
+}
+
+await server.close();
+await src.dispose();
+process.exit(failed ? 1 : 0);

@@ -1077,3 +1077,187 @@ body::before {
     }
   }
 }
+
+/* ============================================================ pairing (PC, waiting for a phone) */
+@layer components {
+  .pair {
+    display: grid;
+    gap: var(--s-10);
+    justify-items: center;
+    width: 100%;
+    max-width: 1000px;
+    margin-inline: auto;
+  }
+  .pair-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s-5);
+    max-width: 520px;
+  }
+  .pair-copy .t-display {
+    text-wrap: balance;
+  }
+  @media (min-width: 900px) {
+    .pair {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      justify-items: start;
+      gap: clamp(48px, 7vw, 112px);
+      text-align: left;
+    }
+    .pair-copy {
+      align-items: flex-start;
+    }
+  }
+  .pair-steps {
+    list-style: none;
+    margin: var(--s-2) 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    text-align: left;
+  }
+  .pair-steps li {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: var(--s-3);
+    align-items: start;
+  }
+  .pair-steps li > span:last-child {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .pair-step-n {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: var(--t-micro);
+    color: var(--text-2);
+    background: var(--surface);
+    box-shadow: var(--sh-hair);
+  }
+  .pair-step-t {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .pair-approve {
+    display: flex;
+    flex-direction: column;
+    align-items: inherit;
+    gap: var(--s-4);
+  }
+  .pair-manual {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    width: 100%;
+    margin-top: var(--s-2);
+    padding: var(--s-5);
+    border-radius: var(--r-l);
+    background: var(--surface);
+    box-shadow: var(--sh-hair);
+    text-align: left;
+  }
+  .pair-manual-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-2) var(--s-3);
+  }
+
+  /* the six-character code: one cell per character, restaggers when the code rotates */
+  .code-cells {
+    display: inline-flex;
+    gap: 6px;
+  }
+  .code-cell {
+    width: 40px;
+    height: 48px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: var(--bg-sink);
+    box-shadow: inset 0 0 0 1px var(--hairline-2);
+    font-family: var(--font-mono);
+    font-size: 1.375rem;
+    font-weight: 600;
+    color: var(--text);
+    animation: cell-in 380ms var(--ease-out) both;
+    animation-delay: calc(var(--i, 0) * 30ms);
+  }
+  @keyframes cell-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+      filter: blur(4px);
+    }
+  }
+
+  /* copyable value: press feedback + icon crossfade (blur bridges the two glyphs) */
+  .copy-field {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    height: 34px;
+    padding: 0 var(--s-3);
+    border: 0;
+    border-radius: var(--r-full);
+    background: var(--surface-2);
+    box-shadow: var(--sh-hair);
+    color: var(--text);
+    cursor: pointer;
+    transition:
+      transform var(--d-micro) var(--ease-out),
+      background-color var(--d-micro) ease;
+  }
+  .copy-field:active {
+    transform: scale(0.97);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .copy-field:hover {
+      background: var(--surface-3);
+    }
+  }
+  .icon-swap {
+    display: grid;
+    color: var(--text-3);
+  }
+  .icon-swap > * {
+    grid-area: 1 / 1;
+    transition:
+      opacity 160ms ease,
+      transform 200ms var(--ease-out),
+      filter 200ms ease;
+  }
+  .icon-swap .icon-b {
+    color: var(--accent);
+    opacity: 0;
+    transform: scale(0.6);
+    filter: blur(3px);
+  }
+  [data-copied="true"] .icon-swap .icon-a {
+    opacity: 0;
+    transform: scale(0.6);
+    filter: blur(3px);
+  }
+  [data-copied="true"] .icon-swap .icon-b {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .code-cell {
+      animation: fade-in var(--d-ui) ease both;
+      animation-delay: 0ms;
+    }
+    .icon-swap > * {
+      transition: opacity 160ms ease;
+    }
+  }
+}

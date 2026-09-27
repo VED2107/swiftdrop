@@ -1,4 +1,7 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { createLogger, setLogLevel } from "@swiftdrop/shared";
 import { createApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
@@ -69,8 +72,45 @@ async function alreadyRunning(base: string): Promise<boolean> {
   }
 }
 
+/**
+ * Opens the UI. On Windows it gets its own app window (Edge or Chrome in --app mode with a
+ * dedicated profile: no tabs, no address bar, its own taskbar entry) so SwiftDrop feels like
+ * a desktop app rather than a web page. Falls back to the default browser.
+ * SWIFTDROP_OPEN=browser forces a normal browser tab.
+ */
 function openBrowser(url: string) {
+  if (process.platform === "win32" && process.env.SWIFTDROP_OPEN !== "browser") {
+    const exe = appBrowser();
+    if (exe) {
+      const profile = join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "SwiftDrop", "window");
+      const child = spawn(exe, [`--app=${url}`, `--user-data-dir=${profile}`, "--window-size=1280,860", "--no-first-run", "--no-default-browser-check"], {
+        detached: true,
+        stdio: "ignore",
+      });
+      child.on("error", () => openDefault(url));
+      child.unref();
+      return;
+    }
+  }
+  openDefault(url);
+}
+
+function openDefault(url: string) {
   const cmd = process.platform === "win32" ? "cmd" : process.platform === "darwin" ? "open" : "xdg-open";
   const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
   spawn(cmd, args, { detached: true, stdio: "ignore", windowsHide: true }).unref();
+}
+
+function appBrowser(): string | null {
+  const pf = process.env.ProgramFiles ?? "C:\\Program Files";
+  const pf86 = process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)";
+  const local = process.env.LOCALAPPDATA ?? "";
+  const candidates = [
+    join(pf86, "Microsoft", "Edge", "Application", "msedge.exe"),
+    join(pf, "Microsoft", "Edge", "Application", "msedge.exe"),
+    join(pf, "Google", "Chrome", "Application", "chrome.exe"),
+    join(pf86, "Google", "Chrome", "Application", "chrome.exe"),
+    ...(local ? [join(local, "Google", "Chrome", "Application", "chrome.exe")] : []),
+  ];
+  return candidates.find((c) => existsSync(c)) ?? null;
 }

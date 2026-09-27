@@ -1,7 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
+# esbuild (used by Vite and the exe bundler) needs its install script.
 allowBuilds:
-  esbuild: set this to true or false
-onlyBuiltDependencies:
-  - esbuild
+  esbuild: true

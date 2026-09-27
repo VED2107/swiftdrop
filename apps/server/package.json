@@ -1,0 +1,23 @@
+{
+  "name": "@swiftdrop/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/main.ts",
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@swiftdrop/crypto": "workspace:*",
+    "@swiftdrop/protocol": "workspace:*",
+    "@swiftdrop/shared": "workspace:*",
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.5",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "var(--ease-spring)",
+        "createdAt": "2026-09-27T09:45:19.044Z",
+        "reason": "Claude decided: token is a linear() curve with ~3% overshoot used only for QR settle, device highlight, check and toast entrances; not a bounce"
+      }
+    ]
+  }
+}

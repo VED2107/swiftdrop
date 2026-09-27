@@ -1,0 +1,36 @@
+{
+  "name": "swiftdrop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@11.1.1",
+  "engines": {
+    "node": ">=20.10"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c cyan,magenta \"pnpm --filter @swiftdrop/server dev\" \"pnpm --filter @swiftdrop/web dev\"",
+    "build": "pnpm --filter @swiftdrop/web build",
+    "start": "pnpm build && pnpm --filter @swiftdrop/server start",
+    "serve": "pnpm --filter @swiftdrop/server start",
+    "typecheck": "tsc -p tsconfig.json && tsc -p apps/web/tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "bench": "tsx tests/performance/bench.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.10.0",
+    "concurrently": "^9.1.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "yauzl": "^3.2.0",
+    "@types/yauzl": "^2.10.3",
+    "@swiftdrop/protocol": "workspace:*",
+    "@swiftdrop/shared": "workspace:*",
+    "@swiftdrop/crypto": "workspace:*",
+    "@swiftdrop/transfer-engine": "workspace:*",
+    "@swiftdrop/server": "workspace:*"
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "at": "2026-09-27T08:54:22.179Z",
+  "node": "v24.13.0",
+  "rows": [
+    {
+      "scenario": "100 MB file",
+      "state": "complete",
+      "avgMBs": 173.3,
+      "peakMBs": 0,
+      "duration": "00:01",
+      "filesPerSec": 2,
+      "streams": 3,
+      "chunk": "4.2 MB",
+      "cpuPct": 135,
+      "peakRss": "175 MB",
+      "retries": 0,
+      "chunkFailures": 0
+    },
+    {
+      "scenario": "1 GB file",
+      "state": "complete",
+      "avgMBs": 256.7,
+      "peakMBs": 268.4,
+      "duration": "00:04",
+      "filesPerSec": 0,
+      "streams": 4,
+      "chunk": "16.8 MB",
+      "cpuPct": 153,
+      "peakRss": "327 MB",
+      "retries": 0,
+      "chunkFailures": 0
+    },
+    {
+      "scenario": "1,000 photos (3 MB)",
+      "state": "complete",
+      "avgMBs": 224.1,
+      "peakMBs": 233,
+      "duration": "00:13",
+      "filesPerSec": 75,
+      "streams": 3,
+      "chunk": "16.8 MB",
+      "cpuPct": 196,
+      "peakRss": "225 MB",
+      "retries": 0,
+      "chunkFailures": 0
+    },
+    {
+      "scenario": "1,000 small (200 KB)",
+      "state": "complete",
+      "avgMBs": 116,
+      "peakMBs": 0,
+      "duration": "00:02",
+      "filesPerSec": 580,
+      "streams": 3,
+      "chunk": "8.4 MB",
+      "cpuPct": 139,
+      "peakRss": "296 MB",
+      "retries": 0,
+      "chunkFailures": 0
+    },
+    {
+      "scenario": "10,000 small (50 KB)",
+      "state": "complete",
+      "avgMBs": 45,
+      "peakMBs": 52.9,
+      "duration": "00:11",
+      "filesPerSec": 900,
+      "streams": 4,
+      "chunk": "8.4 MB",
+      "cpuPct": 130,
+      "peakRss": "524 MB",
+      "retries": 0,
+      "chunkFailures": 0
+    }
+  ]
+}

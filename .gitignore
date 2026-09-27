@@ -1,0 +1,9 @@
+node_modules
+dist
+.swiftdrop
+*.log
+test-results
+playwright-report
+.impeccable/review
+.impeccable/build
+.playwright-mcp

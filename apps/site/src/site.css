@@ -1,0 +1,84 @@
+@source "../index.html";
+
+@layer components {
+  html {
+    scroll-behavior: smooth;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+  a.navlink,
+  a.wordmark {
+    text-decoration: none;
+  }
+  .step {
+    display: grid;
+    grid-template-columns: 40px 1fr;
+    gap: var(--s-4);
+    padding: var(--s-6) 0;
+    box-shadow: 0 1px 0 var(--hairline);
+  }
+  .step:first-child {
+    padding-top: 0;
+  }
+  .step-n {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: var(--t-small);
+    color: var(--text-2);
+    background: var(--surface);
+    box-shadow: var(--sh-hair);
+  }
+  .feature {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    max-width: 44ch;
+  }
+  .privacy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-4);
+    padding: clamp(var(--s-8), 6vw, var(--s-16));
+    border-radius: var(--r-xl);
+    background: radial-gradient(90% 120% at 0% 0%, oklch(0.91 0.19 124 / 0.06), transparent 60%), var(--surface);
+    box-shadow: var(--sh-hair);
+  }
+  .faq details {
+    box-shadow: 0 1px 0 var(--hairline);
+  }
+  .faq summary {
+    list-style: none;
+    cursor: pointer;
+    padding: var(--s-5) 0;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-4);
+  }
+  .faq summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq summary::after {
+    content: "+";
+    color: var(--text-3);
+    font-weight: 400;
+    transition: transform var(--d-ui) var(--ease-out);
+  }
+  .faq details[open] summary::after {
+    transform: rotate(45deg);
+  }
+  .faq details p {
+    color: var(--text-2);
+    margin: 0 0 var(--s-5);
+    max-width: 62ch;
+    animation: swap-in var(--d-ui) var(--ease-out) both;
+  }
+}

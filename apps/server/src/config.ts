@@ -24,7 +24,14 @@ export interface ServerConfig {
   isHostRequest?: (req: IncomingMessage) => boolean;
 }
 
-const here = dirname(fileURLToPath(import.meta.url));
+// In the packaged exe (CommonJS bundle) import.meta.url doesn't exist; the web root comes from env there.
+const here = (() => {
+  try {
+    return dirname(fileURLToPath(import.meta.url));
+  } catch {
+    return process.cwd();
+  }
+})();
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const stateDir = resolve(env.SWIFTDROP_STATE_DIR ?? join(homedir(), ".swiftdrop"));

@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "bench": "tsx tests/performance/bench.ts"
+    "bench": "tsx tests/performance/bench.ts",
+    "build:exe": "node scripts/build-exe.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
@@ -31,6 +32,8 @@
     "@swiftdrop/shared": "workspace:*",
     "@swiftdrop/crypto": "workspace:*",
     "@swiftdrop/transfer-engine": "workspace:*",
-    "@swiftdrop/server": "workspace:*"
+    "@swiftdrop/server": "workspace:*",
+    "esbuild": "^0.25.0",
+    "postject": "1.0.0-alpha.6"
   }
 }

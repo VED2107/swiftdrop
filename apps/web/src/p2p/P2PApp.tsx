@@ -412,7 +412,7 @@ function ReceiveProgress({ t, receiver, peer }: { t: ReceivedTransfer; receiver:
 function Bar({ pct }: { pct: number }) {
   return (
     <div style={{ height: 6, borderRadius: 3, background: "var(--surface-2)", overflow: "hidden" }} role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
-      <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)", transition: "width 240ms ease-out" }} />
+      <div style={{ width: "100%", height: "100%", background: "var(--accent)", transform: `scaleX(${pct / 100})`, transformOrigin: "left", transition: "transform 240ms ease-out" }} />
     </div>
   );
 }

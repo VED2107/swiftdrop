@@ -4,146 +4,136 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#141518" />
-    <title>SwiftDrop · Transfer without the cloud</title>
-    <meta name="description" content="Move photos, videos and files between your iPhone or Android and your Windows PC, directly over your own Wi-Fi. No cloud, no account, nothing to install on your phone." />
-    <meta property="og:title" content="SwiftDrop · Transfer without the cloud" />
-    <meta property="og:description" content="Phone ↔ PC file transfer over your own Wi-Fi. No cloud, no account." />
+    <meta name="theme-color" content="#121212" />
+    <title>SwiftDrop · Your camera roll, straight to your PC</title>
+    <meta name="description" content="Move photos, videos and files between your iPhone or Android and your Windows PC, directly over your own Wi-Fi. No cloud, no cable, no account, nothing to install on the phone." />
+    <meta property="og:title" content="SwiftDrop · Your camera roll, straight to your PC" />
+    <meta property="og:description" content="Phone and PC file transfer over your own Wi-Fi. No cloud, no cable, no account." />
+    <meta property="og:image" content="/icon-512.png" />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icon-180.png" />
+    <link rel="preload" as="image" href="/frames/f01.webp" type="image/webp" />
   </head>
   <body>
-    <header class="topbar">
+    <!-- Grease-pencil stroke texture shared by every mark on the page. -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+      <filter id="grease" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7" result="n" />
+        <feDisplacementMap in="SourceGraphic" in2="n" scale="3.2" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
+
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="nav">
       <a class="wordmark" href="#top" aria-label="SwiftDrop home">
-        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="7" fill="var(--surface-2)" /><path d="M7.5 12h9" stroke="var(--text-3)" stroke-width="1.5" stroke-linecap="round" /><circle cx="7" cy="12" r="2.4" fill="var(--text)" /><circle cx="17" cy="12" r="2.4" fill="var(--accent)" /></svg>
-        SwiftDrop
+        <img src="/favicon.svg" width="26" height="26" alt="" />
+        <span>SwiftDrop</span>
       </a>
-      <nav class="flex items-center gap-1" aria-label="Main">
-        <a class="navlink hidden sm:inline-flex" href="#how">How it works</a>
-        <a class="navlink hidden sm:inline-flex" href="#privacy">Privacy</a>
-        <a class="navlink hidden sm:inline-flex" href="#faq">FAQ</a>
-        <a class="btn btn-secondary btn-sm ml-2" data-download href="#">Download</a>
+      <nav aria-label="Main">
+        <a class="navlink" href="#how">How it works</a>
+        <a class="navlink" href="#privacy">Privacy</a>
+        <a class="navlink" href="#faq">Questions</a>
+        <a class="btn btn-sm" data-download href="#">Download</a>
       </nav>
     </header>
 
-    <main id="top" class="w-full max-w-[1040px] mx-auto px-[var(--gutter)]">
-      <!-- hero -->
-      <section class="flex flex-col items-center text-center gap-10 pt-16 md:pt-28 pb-24">
-        <div class="flex flex-col items-center gap-5 max-w-[760px]">
-          <h1 class="t-display hero-title rise">Transfer without the cloud.</h1>
-          <p class="t-lead rise max-w-[560px]" style="--i: 2">Move photos, videos and files between your phone and your PC — directly over your own Wi-Fi. Scan once, drop anything, done.</p>
-        </div>
-        <div class="flex flex-col items-center gap-3 rise" style="--i: 3">
-          <div class="flex flex-wrap justify-center gap-2">
-            <a class="btn btn-primary btn-lg" data-download href="#">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>
+    <main id="main">
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <div class="hero-copy wrap">
+          <h1 id="hero-title" class="display">Your camera roll, straight to your&nbsp;PC.</h1>
+          <p class="lead">Photos, videos and files move between phone and PC over your own Wi-Fi. No cloud, no cable, no account.</p>
+          <div class="actions">
+            <a class="btn btn-primary" data-download href="#">
+              <span class="icon" data-icon="download"></span>
               Download for Windows
             </a>
-            <a class="btn btn-ghost btn-lg" href="#how">How it works</a>
+            <a class="btn btn-quiet" href="#how">How it works</a>
           </div>
-          <p class="t-small" data-platform-note>Free · Windows 10 or 11 · Works with iPhone and Android, nothing to install on the phone</p>
         </div>
 
-        <!-- the product's pulse: a live-looking link, phone → PC -->
-        <div class="hero-link w-full max-w-[760px] mt-10 rise" style="--i: 4">
-          <div class="link" data-flow="right" style="--track-w: 460px; --flow-dur: 0.95s; --pw: 22px">
-            <div class="device" data-live="true">
-              <div class="device-glyph"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2.5" /><path d="M11 18h2" /></svg></div>
-              <span class="device-name">Phone</span>
+        <figure class="roll" aria-label="Photos moving from a phone to a PC, each one checked off as it arrives">
+          <div class="roll-strip strip" data-roll>
+            <div class="rebate rebate-top" aria-hidden="true"><span class="edge edge-l">Phone</span><span class="edge edge-r">PC</span></div>
+            <div class="roll-window">
+              <ol class="roll-track" data-track></ol>
             </div>
-            <div class="track" aria-hidden="true">
-              <div class="track-line" style="animation: none; opacity: 0.6"></div>
-              <div class="track-stream" data-stream></div>
-            </div>
-            <div class="device" data-live="true">
-              <div class="device-glyph"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div>
-              <span class="device-name">Your PC</span>
-            </div>
+            <div class="rebate rebate-bottom" aria-hidden="true"></div>
+            <div class="gate" aria-hidden="true"><span class="edge">Checked on arrival</span></div>
           </div>
-          <p class="link-caption justify-center w-full mt-4"><span class="dot" data-state="live"></span>Directly over your Wi-Fi</p>
+        </figure>
+      </section>
+
+      <section class="sheet wrap" id="how" aria-labelledby="how-title">
+        <h2 id="how-title" class="h2">Scan once. Then send anything, either&nbsp;way.</h2>
+        <div class="prints">
+          <figure class="print print-a">
+            <div class="print-img"><img src="/shots/pc-pair.webp" width="1600" height="1025" loading="lazy" alt="SwiftDrop on a Windows PC showing a QR code and a six-character pairing code" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
+            <figcaption><span class="edge num">1</span>Open SwiftDrop on your PC. It shows a code to scan.</figcaption>
+          </figure>
+          <figure class="print print-b">
+            <div class="print-img"><img src="/shots/phone-ready.webp" width="1170" height="2532" loading="lazy" alt="An iPhone connected to the PC, with Send photos and Files buttons" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
+            <figcaption><span class="edge num">2</span>Point your phone's camera at it, then tap Allow on the PC.</figcaption>
+          </figure>
+          <figure class="print print-c">
+            <div class="print-img"><img src="/shots/pc-received.webp" width="1600" height="1025" loading="lazy" alt="The PC confirming four files received and the folder they were saved to" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
+            <figcaption><span class="edge num">3</span>Pick photos on the phone. They land in a folder you choose on the PC.</figcaption>
+          </figure>
+        </div>
+        <p class="sheet-note">The other way works too: choose files on the PC and download them on the phone, straight from where they sit. Nothing is copied first.</p>
+      </section>
+
+      <section class="resume wrap" aria-labelledby="resume-title">
+        <div class="resume-copy">
+          <h2 id="resume-title" class="h2">Wi-Fi dropped? It carries&nbsp;on.</h2>
+          <p class="body">Every piece is checked when it lands. After a drop, SwiftDrop sends only what's missing, never the whole thing again.</p>
+        </div>
+        <div class="cut-strip" data-cut role="img" aria-label="A strip of nine frames: frames one to four arrived, the connection dropped, then frames five to nine followed">
+          <div class="strip cut-piece" data-piece="a"></div>
+          <div class="cut-gap"><span class="edge">Wi-Fi lost</span><svg viewBox="0 0 24 200" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M12 4 C4 40 20 70 11 100 C3 130 20 160 12 196" /></svg><span class="edge">Back</span></div>
+          <div class="strip cut-piece" data-piece="b"></div>
         </div>
       </section>
 
-      <!-- how it works -->
-      <section id="how" class="py-24 scroll-mt-20" aria-labelledby="how-title">
-        <div class="grid gap-12 md:grid-cols-[1fr_1.4fr] md:gap-20">
-          <div class="flex flex-col gap-4">
-            <h2 id="how-title" class="t-h1">Three steps. Then it just works.</h2>
-            <p class="t-lead">No account, no app store, no cables. Your phone uses its normal browser.</p>
-          </div>
-          <ol class="list-none m-0 p-0">
-            <li class="step">
-              <span class="step-n num">1</span>
-              <div><h3 class="t-h2">Open SwiftDrop on your PC</h3><p class="t-body mt-1">Run SwiftDrop.exe. Its window shows a code to scan.</p></div>
-            </li>
-            <li class="step">
-              <span class="step-n num">2</span>
-              <div><h3 class="t-h2">Scan it with your phone</h3><p class="t-body mt-1">Point your iPhone or Android camera at the code, then tap Allow on the PC. Same Wi-Fi, or your phone's hotspot.</p></div>
-            </li>
-            <li class="step">
-              <span class="step-n num">3</span>
-              <div><h3 class="t-h2">Send anything, either way</h3><p class="t-body mt-1">Pick photos on the phone and they land in a folder on your PC. Drop files on the PC and they're ready on the phone.</p></div>
-            </li>
-          </ol>
-        </div>
+      <section class="privacy wrap" id="privacy" aria-labelledby="privacy-title">
+        <h2 id="privacy-title" class="statement">Your files <span class="marked">never<svg viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 15 C60 6 130 20 190 11 C230 5 270 14 296 9" /></svg></span> touch a&nbsp;server.</h2>
+        <p class="body">There is no SwiftDrop cloud. Files go from one device to the other over your own network, and it works with no internet at all. A new phone can only connect after you tap Allow on your PC.</p>
       </section>
 
-      <!-- why -->
-      <section class="py-24" aria-label="Why SwiftDrop">
-        <div class="grid gap-x-20 gap-y-14 md:grid-cols-2">
-          <div class="feature"><svg class="feature-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"/><path d="M8.5 16a5 5 0 0 1 7 0"/><path d="M12 19.5h.01"/><path d="M2 9a14.5 14.5 0 0 1 20 0"/></svg><h3 class="t-h2">Nothing leaves your network</h3><p class="t-body">Files travel from one device to the other over your own Wi-Fi. There's no upload, no server in between, and it works without internet.</p></div>
-          <div class="feature"><svg class="feature-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg><h3 class="t-h2">As fast as your Wi-Fi</h3><p class="t-body">Transfers run over several parallel connections that adapt to your network, so big videos and thousand-photo batches move at the speed your router allows.</p></div>
-          <div class="feature"><svg class="feature-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/></svg><h3 class="t-h2">Picks up where it stopped</h3><p class="t-body">Lose Wi-Fi halfway through a 10 GB video? SwiftDrop resumes from the last piece, never from zero, and checks every piece arrived intact.</p></div>
-          <div class="feature"><svg class="feature-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m9 13 2 2 4-4"/></svg><h3 class="t-h2">Straight into your folder</h3><p class="t-body">No "download each file" prompts on the PC. Everything lands in the folder you choose, with folders kept intact.</p></div>
-        </div>
-      </section>
-
-      <!-- under the hood: facts from the code, no speed claims -->
-      <section class="py-16" aria-labelledby="spec-title">
-        <h2 id="spec-title" class="t-h2 mb-6">Under the hood</h2>
-        <dl class="spec">
-          <div><dt>Connection</dt><dd>Phone to PC directly, over your LAN</dd></div>
-          <div><dt>Parallel streams</dt><dd class="num">Up to 6, tuned live</dd></div>
-          <div><dt>Integrity check</dt><dd>Every 1 MiB block hashed on both ends</dd></div>
-          <div><dt>Resume</dt><dd>From the last verified block</dd></div>
-          <div><dt>Pairing</dt><dd>One-time code, expires in 5 minutes</dd></div>
-          <div><dt>Account</dt><dd>None</dd></div>
+      <section class="facts wrap" aria-labelledby="facts-title">
+        <h2 id="facts-title" class="h3">The details</h2>
+        <dl>
+          <div><dt class="edge">Account</dt><dd>None</dd></div>
+          <div><dt class="edge">Pairing</dt><dd>You approve each phone, once</dd></div>
+          <div><dt class="edge">Checks</dt><dd>Every 1 MiB block, on both ends</dd></div>
+          <div><dt class="edge">Install</dt><dd>For your user, no admin needed</dd></div>
         </dl>
       </section>
 
-      <!-- privacy -->
-      <section id="privacy" class="py-24 scroll-mt-20" aria-labelledby="privacy-title">
-        <div class="privacy">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-          <h2 id="privacy-title" class="t-h1">Private by default.</h2>
-          <p class="t-lead max-w-[620px]">SwiftDrop never sees your files. There's no SwiftDrop cloud to see them. A new device can only connect after you tap Allow on your PC, and pairing codes expire in minutes.</p>
-        </div>
-      </section>
-
-      <!-- faq -->
-      <section id="faq" class="py-24 scroll-mt-20" aria-labelledby="faq-title">
-        <h2 id="faq-title" class="t-h1 mb-8">Questions</h2>
-        <div class="faq">
+      <section class="faq wrap" id="faq" aria-labelledby="faq-title">
+        <h2 id="faq-title" class="h2">Questions</h2>
+        <div class="faq-list">
           <details><summary>Do I need to install anything on my phone?</summary><p>No. SwiftDrop opens in Safari or Chrome on your phone after you scan the code. Only the PC runs the app.</p></details>
-          <details><summary>Does it work with Android?</summary><p>Yes. iPhone and Android both work: scan with the camera (or Google Lens), or type the 6-character code shown on the PC.</p></details>
-          <details><summary>Do I need internet?</summary><p>No. Both devices only need to be on the same Wi-Fi. If there's no Wi-Fi, turn on your phone's hotspot and connect the PC to it.</p></details>
-          <details><summary>Windows asked about the firewall. Is that normal?</summary><p>Yes. The first time SwiftDrop starts, Windows asks whether it may accept connections. Allow it on private networks so your phone can reach your PC.</p></details>
-          <details><summary>Are there size limits?</summary><p>Not in practice. Large videos stream straight to disk on the PC. Keep SwiftDrop on screen on your phone while it sends, since phones pause web pages in the background.</p></details>
-          <details><summary>Will my iPhone photos stay HEIC?</summary><p>The iPhone photo picker may convert to JPEG. For originals, tap Options → Current in the picker, or send them from the Files app.</p></details>
+          <details><summary>Does it work with Android?</summary><p>Yes. iPhone and Android both work: scan with the camera (or Google Lens), or type the six-character code shown on the PC.</p></details>
+          <details><summary>Do I need internet?</summary><p>No. Both devices only need to be on the same Wi-Fi. With no Wi-Fi around, turn on your phone's hotspot and connect the PC to it.</p></details>
+          <details><summary>Windows asked about the firewall. Is that normal?</summary><p>Yes. Allow SwiftDrop on private networks so your phone can reach your PC. If you install for all users, the installer sets this up for you.</p></details>
+          <details><summary>Can I rename my phone, or pair it again?</summary><p>Yes. Rename it on the PC in Settings, or from the phone itself. Pairing the same phone again keeps one entry instead of adding a second.</p></details>
+          <details><summary>Are there size limits?</summary><p>Not in practice. Big videos go straight to disk on the PC. Keep SwiftDrop on screen on your phone while it sends, since phones pause web pages in the background.</p></details>
+          <details><summary>Will my iPhone photos stay HEIC?</summary><p>The photo picker may convert them to JPEG. For originals, tap Options, then Current, in the picker, or send them from the Files app.</p></details>
         </div>
       </section>
 
-      <section class="py-28 flex flex-col items-center text-center gap-6">
-        <h2 class="t-display" style="font-size: clamp(2.25rem, 1.5rem + 3vw, 3.5rem)">Your files, your network.</h2>
-        <a class="btn btn-primary btn-lg" data-download href="#">Download for Windows</a>
-        <p class="t-small" data-platform-note>Free · Windows 10 or 11</p>
+      <section class="close wrap" aria-labelledby="close-title">
+        <h2 id="close-title" class="display display-close">Your photos, your network.</h2>
+        <a class="btn btn-primary" data-download href="#"><span class="icon" data-icon="download"></span>Download for Windows</a>
+        <p class="small" data-platform-note>Free for Windows 10 and 11. Nothing to install on the phone.</p>
       </section>
     </main>
 
-    <footer class="w-full max-w-[1040px] mx-auto px-[var(--gutter)] pb-12 pt-8 flex flex-wrap justify-between gap-4" style="box-shadow: 0 -1px 0 var(--hairline)">
-      <p class="t-small">SwiftDrop · Files stay on your local network.</p>
-      <p class="t-micro">No cloud upload · No account</p>
+    <footer class="footer wrap">
+      <a class="wordmark" href="#top"><img src="/favicon.svg" width="22" height="22" alt="" /><span>SwiftDrop</span></a>
+      <p class="small">Files stay on your network.</p>
     </footer>
 
     <script type="module" src="/src/main.ts"></script>

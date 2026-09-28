@@ -8,6 +8,15 @@
         "value": "var(--ease-spring)",
         "createdAt": "2026-09-27T09:45:19.044Z",
         "reason": "Claude decided: token is a linear() curve with ~3% overshoot used only for QR settle, device highlight, check and toast entrances; not a bounce"
+      },
+      {
+        "rule": "flat-type-hierarchy",
+        "value": "*",
+        "files": [
+          "apps/site/index.html"
+        ],
+        "createdAt": "2026-09-28T19:57:20.940Z",
+        "reason": "Claude: detector scanned index.html without the Vite-imported site.css (all roles read 16px); built CSS sets h1 clamp(2.5-5.6rem), h2 clamp(1.9-3.1rem), body 1.0625rem"
       }
     ]
   }

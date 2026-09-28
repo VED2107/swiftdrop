@@ -1,168 +1,745 @@
-@source "../index.html";
+@import "@fontsource-variable/archivo/standard.css";
 
-@layer components {
+/* Contact sheet: film-base black, off-white print, edge-print grey, one grease-pencil red. */
+:root {
+  --ground: #121212;
+  --film: #1c1c1d;
+  --film-2: #262628;
+  --print: #ebe8e1;
+  --print-2: #b9b6b0;
+  --edge: #8d9199;
+  --red: #d8322a;
+  --red-ink: #c0281f;
+  --red-press: #a8221a;
+  --line: #2c2c2f;
+
+  --display: "Archivo Variable", system-ui, sans-serif;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-advance: cubic-bezier(0.77, 0, 0.175, 1);
+  --gutter: clamp(20px, 4vw, 56px);
+  --frame-w: clamp(176px, 21vw, 300px);
+  --frame-h: calc(var(--frame-w) * 0.75);
+  --frame-gap: 14px;
+  --rebate: clamp(26px, 2.6vw, 34px);
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--ground);
+  color: var(--print);
+  font-family: var(--display);
+  font-stretch: 100%;
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+  scroll-padding-top: 88px;
+  scrollbar-color: var(--film-2) var(--ground);
+  caret-color: var(--red);
+}
+@media (prefers-reduced-motion: reduce) {
   html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
   }
-  @media (prefers-reduced-motion: reduce) {
-    html {
-      scroll-behavior: auto;
-    }
+}
+body {
+  margin: 0;
+  overflow-x: clip;
+  min-height: 100dvh;
+  font-size: 1.0625rem;
+  line-height: 1.55;
+}
+::selection {
+  background: var(--red);
+  color: #fff;
+}
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+a {
+  color: inherit;
+}
+:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.wrap {
+  width: 100%;
+  max-width: 1240px;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+.skip {
+  position: absolute;
+  left: var(--gutter);
+  top: -60px;
+  background: var(--print);
+  color: var(--ground);
+  padding: 8px 12px;
+  border-radius: 2px;
+  z-index: 30;
+}
+.skip:focus {
+  top: 12px;
+}
+
+/* ---- type ------------------------------------------------------------------ */
+
+.display {
+  margin: 0;
+  font-stretch: 112%;
+  font-weight: 800;
+  font-size: clamp(2.5rem, 1.1rem + 5.2vw, 5.6rem);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  max-width: 16ch;
+}
+.h2 {
+  margin: 0;
+  font-stretch: 108%;
+  font-weight: 750;
+  font-size: clamp(1.9rem, 1.2rem + 2.4vw, 3.1rem);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  max-width: 22ch;
+}
+.h3 {
+  margin: 0;
+  font-stretch: 108%;
+  font-weight: 750;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+.lead {
+  margin: 0;
+  font-size: clamp(1.1rem, 1rem + 0.45vw, 1.35rem);
+  line-height: 1.45;
+  color: var(--print-2);
+  max-width: 38ch;
+  text-wrap: pretty;
+}
+.body {
+  margin: 0;
+  overflow-x: clip;
+  color: var(--print-2);
+  max-width: 60ch;
+  text-wrap: pretty;
+}
+.small {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--edge);
+}
+/* Edge print: the condensed caps film makers print on the rebate. Material, not a label above headings. */
+.edge {
+  font-stretch: 62%;
+  font-weight: 650;
+  font-size: 0.8125rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--edge);
+  line-height: 1;
+}
+
+/* ---- controls --------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 22px;
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  background: var(--film);
+  color: var(--print);
+  font: inherit;
+  font-stretch: 100%;
+  font-weight: 650;
+  font-size: 1.0625rem;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform 160ms var(--ease-out),
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn-sm {
+  height: 38px;
+  padding: 0 14px;
+  font-size: 0.9375rem;
+}
+.btn-primary {
+  background: var(--red-ink);
+  border-color: var(--red-ink);
+  color: #fff;
+}
+.btn-quiet {
+  background: transparent;
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    border-color: var(--edge);
   }
-  a.navlink,
-  a.wordmark {
-    text-decoration: none;
+  .btn-primary:hover {
+    background: var(--red-press);
+    border-color: var(--red-press);
   }
-  .step {
-    display: grid;
-    grid-template-columns: 40px 1fr;
-    gap: var(--s-4);
-    padding: var(--s-6) 0;
-    box-shadow: 0 1px 0 var(--hairline);
+  .navlink:hover {
+    color: var(--print);
   }
-  .step:first-child {
-    padding-top: 0;
-  }
-  .step-n {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    font-size: var(--t-small);
-    color: var(--text-2);
-    background: var(--surface);
-    box-shadow: var(--sh-hair);
-  }
-  .feature {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-2);
-    max-width: 44ch;
-  }
-  .privacy {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--s-4);
-    padding: clamp(var(--s-8), 6vw, var(--s-16));
-    border-radius: var(--r-xl);
-    background: radial-gradient(90% 120% at 0% 0%, oklch(0.91 0.19 124 / 0.06), transparent 60%), var(--surface);
-    box-shadow: var(--sh-hair);
-  }
-  .faq details {
-    box-shadow: 0 1px 0 var(--hairline);
-  }
-  .faq summary {
-    list-style: none;
-    cursor: pointer;
-    padding: var(--s-5) 0;
-    font-weight: 500;
-    letter-spacing: -0.01em;
-    display: flex;
-    justify-content: space-between;
-    gap: var(--s-4);
-  }
-  .faq summary::-webkit-details-marker {
+}
+.icon {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+}
+.icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- nav -------------------------------------------------------------------- */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-inline: var(--gutter);
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 1px 0 var(--line);
+}
+.nav nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  font-stretch: 108%;
+  font-weight: 750;
+  font-size: 1.125rem;
+  letter-spacing: -0.02em;
+}
+.navlink {
+  padding: 8px 12px;
+  color: var(--print-2);
+  text-decoration: none;
+  font-size: 0.9375rem;
+  transition: color 160ms ease;
+}
+.nav .btn {
+  margin-left: 8px;
+}
+@media (max-width: 720px) {
+  .navlink {
     display: none;
-  }
-  .faq summary::after {
-    content: "+";
-    color: var(--text-3);
-    font-weight: 400;
-    transition: transform var(--d-ui) var(--ease-out);
-  }
-  .faq details[open] summary::after {
-    transform: rotate(45deg);
-  }
-  .faq details p {
-    color: var(--text-2);
-    margin: 0 0 var(--s-5);
-    max-width: 62ch;
-    animation: swap-in var(--d-ui) var(--ease-out) both;
   }
 }
 
-@layer components {
-  .hero-title {
-    font-size: clamp(2.75rem, 1.6rem + 5vw, 5.25rem);
-    text-wrap: balance;
-  }
-  /* the hero link is the product's one authored moment: give it room */
-  .hero-link .device-glyph {
-    width: 60px;
-    height: 60px;
-    border-radius: 18px;
-  }
-  .hero-link .device-glyph svg {
-    width: 26px;
-    height: 26px;
-  }
-  .feature-icon {
-    color: var(--accent);
-    margin-bottom: var(--s-2);
-  }
-  .feature .t-body,
-  .step .t-body {
-    color: var(--text-2);
-  }
-  .spec {
-    display: grid;
-    grid-template-columns: 1fr;
-    margin: 0;
-    border-radius: var(--r-l);
-    background: var(--surface);
-    box-shadow: var(--sh-hair);
-    overflow: hidden;
-  }
-  @media (min-width: 520px) {
-    .spec {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-  @media (min-width: 820px) {
-    .spec {
-      grid-template-columns: repeat(3, 1fr);
-    }
-  }
-  .spec > div {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-1);
-    padding: var(--s-5) var(--s-6);
-    box-shadow: inset -1px -1px 0 var(--hairline);
-  }
-  .spec dt {
-    font-size: var(--t-micro);
-    color: var(--text-3);
-  }
-  .spec dd {
-    margin: 0;
-    color: var(--text);
-  }
+/* ---- hero ------------------------------------------------------------------- */
 
-  /* FAQ: height eases open instead of jumping (Chromium; others open instantly) */
-  .faq details {
-    interpolate-size: allow-keywords;
+.hero {
+  min-height: calc(100dvh - 64px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  gap: clamp(40px, 6vh, 72px);
+  padding: clamp(40px, 9vh, 96px) 0 clamp(28px, 6vh, 64px);
+}
+.hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  align-self: center;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+.roll {
+  --frame-h: calc(var(--frame-w) * 0.75);
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ---- film strip -------------------------------------------------------------- */
+
+.strip {
+  position: relative;
+  background: var(--film);
+}
+/* Sprocket holes: the page ground showing through, rounded like the real perforations. */
+.rebate {
+  position: relative;
+  height: var(--rebate);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='12'%3E%3Crect x='6' y='1' width='12' height='10' rx='2.2' fill='%23121212'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: calc(var(--rebate) * 0.8) calc(var(--rebate) * 0.4);
+}
+.rebate-top {
+  background-position: 0 22%;
+}
+.rebate-bottom {
+  background-position: 0 78%;
+}
+.rebate .edge {
+  position: absolute;
+  bottom: 3px;
+  font-size: 0.6875rem;
+  color: #a4a8af;
+}
+.edge-l {
+  left: var(--gutter);
+}
+.edge-r {
+  right: var(--gutter);
+}
+
+.roll-window {
+  overflow: hidden;
+}
+.roll-track {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--frame-gap);
+  display: flex;
+  gap: var(--frame-gap);
+  width: max-content;
+  will-change: transform;
+}
+.frame {
+  position: relative;
+  flex: none;
+  width: var(--frame-w);
+}
+.frame-img {
+  position: relative;
+  height: var(--frame-h);
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--film-2);
+}
+.frame-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.92) contrast(1.03);
+}
+.frame-no {
+  position: absolute;
+  left: 2px;
+  bottom: calc(-1 * var(--rebate) + 7px);
+  font-size: 0.6875rem;
+  color: #a4a8af;
+}
+
+/* The gate: frames to its right are on the PC and carry a tick. */
+.gate {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--gate, 62%);
+  width: 3px;
+  margin-left: -1.5px;
+  pointer-events: none;
+}
+.gate::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--red);
+  filter: url(#grease);
+}
+.gate .edge {
+  position: absolute;
+  top: 7px;
+  left: 10px;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  color: #ff8a80;
+}
+@media (max-width: 600px) {
+  .edge-r {
+    display: none;
   }
-  .faq details::details-content {
-    height: 0;
-    overflow: clip;
-    transition:
-      height var(--d-ui) var(--ease-out),
-      content-visibility var(--d-ui) allow-discrete;
+}
+
+/* ---- grease pencil ----------------------------------------------------------- */
+
+.tick {
+  position: absolute;
+  right: 6%;
+  bottom: 6%;
+  width: 34%;
+  max-width: 88px;
+  aspect-ratio: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+.tick path,
+.cut-gap path,
+.marked path {
+  fill: none;
+  stroke: var(--red);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  filter: url(#grease);
+}
+.tick path {
+  stroke-width: 9;
+  transition: stroke-dashoffset 320ms var(--ease-out);
+}
+.is-ticked .tick path,
+.tick.is-drawn path {
+  stroke-dashoffset: 0;
+}
+
+/* ---- prints (how it works) ---------------------------------------------------- */
+
+.sheet {
+  padding-top: clamp(72px, 12vh, 140px);
+  padding-bottom: clamp(56px, 9vh, 104px);
+}
+.prints {
+  margin-top: clamp(36px, 5vw, 56px);
+  display: grid;
+  grid-template-columns: 1.62fr 0.58fr;
+  grid-template-areas:
+    "a b"
+    "c b";
+  gap: clamp(20px, 2.6vw, 36px);
+  align-items: start;
+}
+.print {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.print-a {
+  grid-area: a;
+}
+.print-b {
+  grid-area: b;
+}
+.print-c {
+  grid-area: c;
+  width: 78%;
+  justify-self: end;
+}
+.print-img {
+  position: relative;
+  padding: 10px;
+  background: var(--film);
+  border-radius: 2px;
+  box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.7);
+}
+.print-img img {
+  border-radius: 1px;
+}
+.print .tick {
+  right: -14px;
+  bottom: -18px;
+  width: 72px;
+}
+.print-b .tick {
+  width: 56px;
+}
+.print figcaption {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 8px;
+  color: var(--print-2);
+  font-size: 1rem;
+  max-width: 46ch;
+}
+.print figcaption .edge {
+  padding-top: 5px;
+  font-size: 0.875rem;
+  color: var(--red);
+}
+.sheet-note {
+  margin: clamp(28px, 4vw, 44px) 0 0;
+  max-width: 58ch;
+  font-size: clamp(1.1rem, 1rem + 0.3vw, 1.25rem);
+  color: var(--print);
+  text-wrap: pretty;
+}
+@media (max-width: 760px) {
+  .prints {
+    grid-template-columns: 1fr;
+    grid-template-areas: "a" "b" "c";
   }
-  .faq details[open]::details-content {
-    height: auto;
+  .print-b {
+    width: 62%;
+    justify-self: center;
   }
-  @media (hover: hover) and (pointer: fine) {
-    .faq summary:hover::after {
-      color: var(--text);
-    }
+  .print-c {
+    width: 100%;
   }
-  @media (prefers-reduced-motion: reduce) {
-    .faq details::details-content {
-      transition: none;
-    }
+}
+
+/* ---- resume ------------------------------------------------------------------ */
+
+.resume {
+  padding-block: clamp(56px, 9vh, 104px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(32px, 4vw, 48px);
+}
+.resume-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cut-strip {
+  /* nine frames and the gap fit the column on desktop; phones scroll the strip */
+  --frame-w: clamp(96px, calc((min(100vw, 1240px) - 2 * var(--gutter) - 96px - 13 * var(--frame-gap)) / 9), 150px);
+  --frame-h: calc(var(--frame-w) * 0.75);
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-inline: calc(-1 * var(--gutter));
+  padding-inline: var(--gutter);
+}
+.cut-strip::-webkit-scrollbar {
+  display: none;
+}
+.cut-piece {
+  flex: none;
+  display: grid;
+  grid-template-rows: var(--rebate) auto var(--rebate);
+}
+.cut-piece .frames {
+  display: flex;
+  gap: var(--frame-gap);
+  padding-inline: var(--frame-gap);
+}
+.cut-piece .frame-no {
+  bottom: calc(-1 * var(--rebate) + 7px);
+}
+.cut-gap {
+  flex: none;
+  width: 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+.cut-gap .edge {
+  color: #ff8a80;
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+.cut-gap svg {
+  flex: 1;
+  width: 18px;
+  margin: 6px 0;
+  overflow: visible;
+}
+.cut-gap path {
+  stroke-width: 3;
+  stroke-dasharray: 0.035 0.03;
+  stroke-dashoffset: 0;
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+.cut-strip.is-cut .cut-gap path {
+  opacity: 1;
+}
+
+/* ---- privacy ----------------------------------------------------------------- */
+
+.privacy {
+  padding-block: clamp(80px, 14vh, 160px);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.statement {
+  margin: 0;
+  font-stretch: 112%;
+  font-weight: 800;
+  font-size: clamp(2.4rem, 1rem + 5vw, 5.2rem);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  max-width: 14ch;
+  text-wrap: balance;
+}
+.marked {
+  position: relative;
+  white-space: nowrap;
+}
+.marked svg {
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  bottom: -0.1em;
+  width: 104%;
+  height: 0.26em;
+  overflow: visible;
+}
+.marked path {
+  stroke-width: 7;
+  transition: stroke-dashoffset 520ms var(--ease-out);
+}
+.marked.is-drawn path {
+  stroke-dashoffset: 0;
+}
+
+/* ---- facts ------------------------------------------------------------------- */
+
+.facts {
+  padding-block: clamp(40px, 7vh, 80px);
+}
+.facts dl {
+  margin: 28px 0 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 clamp(24px, 5vw, 72px);
+}
+.facts dl > div {
+  padding: 22px 0 26px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.facts dd {
+  margin: 0;
+  font-stretch: 104%;
+  font-weight: 650;
+  font-size: clamp(1.25rem, 1rem + 0.8vw, 1.65rem);
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+}
+@media (max-width: 640px) {
+  .facts dl {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- faq --------------------------------------------------------------------- */
+
+.faq {
+  padding-block: clamp(64px, 11vh, 128px);
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.6fr);
+  gap: clamp(24px, 5vw, 80px);
+  align-items: start;
+}
+.faq-list details {
+  border-top: 1px solid var(--line);
+}
+.faq-list details:last-child {
+  border-bottom: 1px solid var(--line);
+}
+.faq-list summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 20px 36px 20px 0;
+  position: relative;
+  font-weight: 600;
+  font-size: 1.125rem;
+}
+.faq-list summary::-webkit-details-marker {
+  display: none;
+}
+.faq-list summary::after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  border-right: 2px solid var(--edge);
+  border-bottom: 2px solid var(--edge);
+  transform: translateY(-70%) rotate(45deg);
+  transition: transform 200ms var(--ease-out);
+}
+.faq-list details[open] summary::after {
+  transform: translateY(-30%) rotate(-135deg);
+}
+.faq-list details p {
+  margin: 0;
+  padding: 0 0 22px;
+  color: var(--print-2);
+  max-width: 60ch;
+}
+@media (max-width: 760px) {
+  .faq {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- close + footer ---------------------------------------------------------- */
+
+.close {
+  padding-block: clamp(80px, 14vh, 160px) clamp(64px, 10vh, 112px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 28px;
+}
+.display-close {
+  font-size: clamp(2.3rem, 1rem + 4.2vw, 4.4rem);
+}
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-block: 28px 40px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---- motion preferences -------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .tick path,
+  .marked path {
+    transition: none;
+  }
+  .btn {
+    transition: none;
   }
 }

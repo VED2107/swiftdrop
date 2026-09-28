@@ -1,0 +1,1 @@
+{"tool":"native-offer-bench","date":"2026-09-29","sizeMb":1024,"offerReadyMs":18,"downloadMBps":322,"note":"loopback, Node fetch; before: same file needed a Chromium upload into the outbox at ~38 MB/s (~27 s)"}

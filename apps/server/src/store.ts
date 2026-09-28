@@ -17,6 +17,7 @@ import {
 import { Bitset, numberedName, Reservoir, sanitizeFileName, sanitizeRelativeDir, type Logger } from "@swiftdrop/shared";
 import type { z } from "zod";
 import type { CreateTransferSchema } from "@swiftdrop/protocol";
+import type { LocalSource } from "./picker.ts";
 
 /**
  * Receiving side of a transfer, on the PC's disk.
@@ -49,6 +50,8 @@ interface FileRec {
   received: Bitset;
   digests: Uint8Array | null;
   finalName?: string;
+  /** PC -> phone only: the original file on this PC, served in place (never copied). */
+  source?: string;
 }
 
 export interface TransferRec {
@@ -84,6 +87,7 @@ interface PersistedFile {
   received?: string;
   digests?: string;
   finalName?: string;
+  source?: string;
 }
 
 interface Persisted {
@@ -456,6 +460,55 @@ export class TransferStore {
   // ---------------------------------------------------------------------------
   // Outbox (PC -> iPhone)
 
+  /**
+   * An offer made of files already on this PC: nothing is staged, the phone downloads the
+   * originals. Only the host can call this (it names local paths).
+   */
+  async createFromLocal(transferId: string, label: string, sources: LocalSource[]): Promise<TransferRec> {
+    if (!sources.length) throw new ProtocolError("BAD_REQUEST", "nothing picked");
+    const files: FileRec[] = sources.map((src, i) => {
+      const blocks = Math.ceil(src.size / BLOCK_SIZE);
+      return {
+        id: `f${String(i).padStart(6, "0")}`,
+        name: sanitizeFileName(src.name),
+        relDir: src.relDir.map((d) => sanitizeFileName(d, "folder")),
+        size: src.size,
+        type: src.type,
+        lastModified: src.lastModified,
+        blocks,
+        decision: "auto",
+        state: "complete",
+        received: full(blocks),
+        digests: null,
+        source: src.path,
+      };
+    });
+    const bytesTotal = files.reduce((s, f) => s + f.size, 0);
+    const t: TransferRec = {
+      id: transferId,
+      direction: "to-guest",
+      label: label.slice(0, 200),
+      integrity: "xxh64",
+      bench: false,
+      deviceId: "host",
+      deviceName: "This PC",
+      createdAt: Date.now(),
+      root: resolve(this.opts.outboxDir, transferId),
+      files,
+      byId: new Map(files.map((f) => [f.id, f])),
+      bytesTotal,
+      bytesDone: bytesTotal,
+      filesDone: files.length,
+      cancelled: false,
+      dirty: true,
+    };
+    this.transfers.set(t.id, t);
+    await this.persist(t);
+    this.opts.log.info(`offer ${t.id}: ${files.length} local files, ${bytesTotal} bytes, served in place`);
+    this.opts.hooks.completed(t);
+    return t;
+  }
+
   offers(): Offer[] {
     const out: Offer[] = [];
     for (const t of this.transfers.values()) {
@@ -471,10 +524,18 @@ export class TransferStore {
     return out.sort((a, b) => b.createdAt - a.createdAt);
   }
 
-  outboxFilePath(t: TransferRec, fileId: string): { path: string; file: FileRec } {
+  /**
+   * Where an offered file's bytes are. A file served in place must still be the one that
+   * was offered: if it was edited, moved or deleted since, refuse rather than send a
+   * different file under the old name and size.
+   */
+  async outboxFilePath(t: TransferRec, fileId: string): Promise<{ path: string; file: FileRec }> {
     const f = t.byId.get(fileId);
     if (!f || t.direction !== "to-guest" || f.state !== "complete") throw new ProtocolError("NOT_FOUND");
-    return { path: join(t.root, f.id), file: f };
+    if (!f.source) return { path: join(t.root, f.id), file: f };
+    const st = await stat(f.source).catch(() => null);
+    if (!st?.isFile() || st.size !== f.size || Math.round(st.mtimeMs) !== f.lastModified) throw new ProtocolError("SOURCE_CHANGED");
+    return { path: f.source, file: f };
   }
 
   /** Load outbox offers left over from an earlier run and drop stale state. */
@@ -673,6 +734,7 @@ export class TransferStore {
           if (f.digests) p.digests = bytesToBase64Url(f.digests);
         }
         if (f.finalName) p.finalName = f.finalName;
+        if (f.source) p.source = f.source;
         return p;
       }),
     };
@@ -727,6 +789,7 @@ export class TransferStore {
         received,
         digests,
         ...(pf.finalName ? { finalName: pf.finalName } : {}),
+        ...(pf.source && p.direction === "to-guest" ? { source: pf.source } : {}),
       };
     });
     const t: TransferRec = {

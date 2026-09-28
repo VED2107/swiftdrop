@@ -24,6 +24,8 @@ export interface AppState {
   joinRequests: JoinRequestView[];
   offers: Offer[];
   destination: string;
+  /** Host only: PC files can be offered in place through a native dialog. */
+  nativePick: boolean;
   /** Guest only: name of the PC folder files land in. */
   folderName: string | null;
   /** Transfers the PC is receiving (or the phone is downloading), from server events. */
@@ -60,6 +62,7 @@ export const app = createStore<AppState>({
   joinRequests: [],
   offers: [],
   destination: "",
+  nativePick: false,
   folderName: null,
   remote: {},
   conflict: null,

@@ -2,7 +2,7 @@ import type { Offer, OfferFile } from "@swiftdrop/protocol";
 import { formatBytes, formatCount } from "@swiftdrop/shared";
 import { Download, FileText, Film, ImageDown, Images, Share, X } from "lucide-react";
 import { useState } from "react";
-import { Api, getToken } from "../lib/api.ts";
+import { Api, ApiError, getToken } from "../lib/api.ts";
 import { canShareFiles, isAndroid, isIOS } from "../lib/env.ts";
 import { kindOf } from "../lib/files.ts";
 import { notify, useApp } from "../lib/store.ts";
@@ -40,8 +40,13 @@ function OfferRow({ offer, perspective, i }: { offer: Offer; perspective: "host"
     try {
       const { ticket } = await Api.ticket(offer.transferId);
       const path = file || offer.files.length === 1 ? `files/${(file ?? offer.files[0]!).id}` : "zip";
+      const href = `/api/offers/${offer.transferId}/${path}?ticket=${encodeURIComponent(ticket)}`;
+      // A failed navigation would save the error body as a "file"; check first.
+      const head = await fetch(href, { method: "HEAD", cache: "no-store" }).catch(() => null);
+      if (!head) throw new ApiError("NETWORK", 0);
+      if (!head.ok) throw new ApiError(head.status === 410 ? "SOURCE_CHANGED" : head.status === 404 ? "NOT_FOUND" : "SERVER", head.status);
       const a = document.createElement("a");
-      a.href = `/api/offers/${offer.transferId}/${path}?ticket=${encodeURIComponent(ticket)}`;
+      a.href = href;
       a.download = "";
       a.rel = "noopener";
       document.body.append(a);
@@ -62,6 +67,7 @@ function OfferRow({ offer, perspective, i }: { offer: Offer; perspective: "host"
       const files = await Promise.all(
         offer.files.map(async (f) => {
           const res = await fetch(`/api/offers/${offer.transferId}/files/${f.id}`, { headers: { authorization: `Bearer ${getToken()}` } });
+          if (res.status === 410) throw new ApiError("SOURCE_CHANGED", 410);
           if (!res.ok) throw new Error("Couldn't load the files from your PC.");
           return new File([await res.blob()], f.name, { type: f.type || "application/octet-stream" });
         }),

@@ -281,6 +281,63 @@ describe("PC -> iPhone", () => {
   });
 });
 
+describe("PC -> iPhone from local files (no staging)", () => {
+  it("serves picked files and folders in place, refuses changed sources, never deletes originals", async () => {
+    const src = join(s.dirs.root, "pc-files");
+    await mkdir(join(src, "Trip", "day 1"), { recursive: true });
+    const movie = bytes(3 * BLOCK_SIZE + 99, 40);
+    const photo = bytes(70_000, 41);
+    await writeFile(join(src, "movie.mp4"), movie);
+    await writeFile(join(src, "Trip", "day 1", "IMG_1.JPG"), photo);
+    await writeFile(join(src, "Trip", "Thumbs.db"), bytes(10, 42));
+
+    const guest = await fetch(`${s.base}/api/host/offers/paths`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ paths: [join(src, "movie.mp4")] }),
+    });
+    expect(guest.status).toBe(403);
+
+    const res = await s.hostFetch("/api/host/offers/paths", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ paths: [join(src, "movie.mp4"), join(src, "Trip")] }),
+    });
+    expect(res.status).toBe(200);
+    const { offer } = (await res.json()) as { offer: { transferId: string; totalBytes: number; files: Array<{ id: string; name: string; relDir: string; type: string }> } };
+    expect(offer.files.map((f) => [f.relDir, f.name])).toEqual([
+      ["", "movie.mp4"],
+      ["Trip/day 1", "IMG_1.JPG"],
+    ]);
+    expect(offer.files[0]!.type).toBe("video/mp4");
+    expect(offer.totalBytes).toBe(movie.length + photo.length);
+    // nothing was copied into the outbox
+    expect(await stat(join(s.dirs.outbox, offer.transferId, offer.files[0]!.id)).catch(() => null)).toBeNull();
+
+    const auth = { authorization: `Bearer ${token}` };
+    const { ticket } = (await (await fetch(`${s.base}/api/offers/${offer.transferId}/ticket`, { method: "POST", headers: auth })).json()) as { ticket: string };
+    const q = `?ticket=${encodeURIComponent(ticket)}`;
+    const one = await fetch(`${s.base}/api/offers/${offer.transferId}/files/${offer.files[0]!.id}${q}`);
+    expect(Buffer.compare(Buffer.from(await one.arrayBuffer()), Buffer.from(movie))).toBe(0);
+    const tail = await fetch(`${s.base}/api/offers/${offer.transferId}/files/${offer.files[0]!.id}${q}`, { headers: { range: "bytes=-50" } });
+    expect(Buffer.compare(Buffer.from(await tail.arrayBuffer()), Buffer.from(movie.subarray(movie.length - 50)))).toBe(0);
+    const zip = await unzip(Buffer.from(await (await fetch(`${s.base}/api/offers/${offer.transferId}/zip${q}`)).arrayBuffer()));
+    expect(Buffer.compare(zip.get("Trip/day 1/IMG_1.JPG")!, Buffer.from(photo))).toBe(0);
+
+    // edited after sharing: refuse instead of sending different bytes under the old size
+    await writeFile(join(src, "Trip", "day 1", "IMG_1.JPG"), bytes(70_001, 43));
+    const stale = await fetch(`${s.base}/api/offers/${offer.transferId}/files/${offer.files[1]!.id}${q}`);
+    expect(stale.status).toBe(410);
+    expect(((await stale.json()) as { code: string }).code).toBe("SOURCE_CHANGED");
+    expect((await fetch(`${s.base}/api/offers/${offer.transferId}/zip${q}`)).status).toBe(410);
+
+    // withdrawing the offer leaves the PC's own files alone
+    expect((await s.hostFetch(`/api/offers/${offer.transferId}`, { method: "DELETE" })).status).toBe(200);
+    expect((await stat(join(src, "movie.mp4"))).size).toBe(movie.length);
+    expect((await stat(join(src, "Trip", "day 1", "IMG_1.JPG"))).isFile()).toBe(true);
+  });
+});
+
 describe("server restart", () => {
   it("keeps pairing and resumes a transfer after the PC app restarts", async () => {
     const data = bytes(12 * BLOCK_SIZE, 30);

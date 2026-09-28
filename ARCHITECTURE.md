@@ -62,4 +62,4 @@ The server writes directly: positional writes into `.part` files, atomic rename 
 1. Wi-Fi airtime — the real ceiling (and shared with everything else on the network).
 2. iPhone reading + hashing + Safari request overhead; mitigated by 1–16 MiB chunks and batching.
 3. NTFS + antivirus per-file creation cost for tens of thousands of small files.
-4. PC → iPhone goes through a local staging copy (loopback, fast) because a web page can't hand the server a file path.
+4. PC → phone: **choose files / choose folder** on the PC opens a native Windows dialog run by the server, so the server gets real paths and the phone downloads the originals in place (no copy, offer ready in milliseconds). Each download re-checks size + mtime; an edited source is refused (`SOURCE_CHANGED`) instead of sent under stale metadata. Withdrawing such an offer never touches the originals. Drag-and-drop onto the page still has to go through a browser upload into a local staging folder (a drop gives the page `File` objects, not paths), which Chromium caps at ~40 MB/s on loopback.

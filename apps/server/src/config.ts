@@ -20,6 +20,8 @@ export interface ServerConfig {
   deviceIdleTtlMs: number;
   logLevel: LogLevel;
   openBrowser: boolean;
+  /** Override for tests: stands in for the native file/folder dialog. */
+  pickLocal?: (mode: "files" | "folder") => Promise<string[] | null>;
   /** Override for tests: decides whether a request comes from the PC itself. */
   isHostRequest?: (req: IncomingMessage) => boolean;
 }

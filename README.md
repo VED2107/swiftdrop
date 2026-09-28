@@ -19,7 +19,7 @@ pnpm start          # builds the web app, starts the server on port 8787, opens 
 2. On the phone (same Wi-Fi, or connect the PC to the phone's hotspot), scan the code with the Camera app (iPhone) or Camera / Google Lens (Android), or open the shown address and type the 6-character code.
 3. Tap **Allow** on the PC.
 4. On the phone, tap **Send photos & videos** or **Send files**. Files land in `Downloads\SwiftDrop` (change it with **Change folder**, which opens the normal Windows folder picker).
-5. To send PC → iPhone, drop files or folders on the PC page. The phone gets a **Download** / **Download all (.zip)** button (and **Save to Photos** for media).
+5. To send PC → iPhone, click **choose files** (or **folder**) on the PC page — the phone downloads the originals straight from disk, nothing is copied — or drop files on the page. The phone gets a **Download** / **Download all (.zip)** button (and **Save to Photos** for media).
 
 **Phone can't connect?** Windows asks to allow Node.js through the firewall on first run — allow it on *Private* networks, and make sure your Wi-Fi is set to Private. Or run once as admin:
 `powershell -ExecutionPolicy Bypass -File scripts\allow-firewall.ps1`

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { access, mkdir, readFile, stat, writeFile, rm } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -15,6 +16,8 @@ import {
   HEADERS,
   JoinRequestSchema,
   MAX_BLOCKS_PER_CHUNK,
+  OfferLocalSchema,
+  PickLocalSchema,
   PROTOCOL_VERSION,
   ProtocolError,
   SettingsPatchSchema,
@@ -26,6 +29,7 @@ import { Auth } from "./auth.ts";
 import { saveSettings, type ServerConfig } from "./config.ts";
 import { Hub } from "./hub.ts";
 import { lanAddresses, localAddressSet } from "./net.ts";
+import { expandPaths, pickDialog, type PickMode } from "./picker.ts";
 import { TransferStore, type TransferRec } from "./store.ts";
 import { writeZip, zipLength, type ZipEntry } from "./zip.ts";
 
@@ -231,7 +235,12 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
 
   // settings -------------------------------------------------------------------------
   route("GET", "/api/host/settings", "host", ({ res }) =>
-    json(res, 200, { destination: config.destination, maxFileSize: config.maxFileSize, platform: process.platform }),
+    json(res, 200, {
+      destination: config.destination,
+      maxFileSize: config.maxFileSize,
+      platform: process.platform,
+      nativePick: Boolean(config.pickLocal) || process.platform === "win32",
+    }),
   );
 
   route("PATCH", "/api/host/settings", "host", async ({ req, res }) => {
@@ -244,7 +253,7 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
   });
 
   route("POST", "/api/host/choose-folder", "host", async ({ res }) => {
-    const picked = await chooseFolderDialog(config.destination);
+    const picked = (await pickDialog("destination", config.destination))?.[0];
     if (picked) {
       config.destination = await validateDestination(picked);
       saveSettings(config);
@@ -334,6 +343,30 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
     json(res, 200, { ticket: auth.signTicket(`offer:${params[0]}`) });
   });
 
+  /** Native picker on the PC: the offer is ready the moment the dialog closes (no upload). */
+  route("POST", "/api/host/offers/pick", "host", async ({ req, res }) => {
+    const { mode } = PickLocalSchema.parse(await readJson(req, 1024));
+    const paths = await (config.pickLocal ?? ((m: PickMode) => pickDialog(m)))(mode);
+    if (!paths?.length) return json(res, 200, { offer: null });
+    json(res, 200, { offer: await offerLocal(paths) });
+  });
+
+  route("POST", "/api/host/offers/paths", "host", async ({ req, res }) => {
+    const { paths } = OfferLocalSchema.parse(await readJson(req, 4 << 20));
+    json(res, 200, { offer: await offerLocal(paths) });
+  });
+
+  async function offerLocal(paths: string[]) {
+    const sources = await expandPaths(paths);
+    if (!sources.length) throw new ProtocolError("BAD_REQUEST", "nothing to send in that folder");
+    const maxSize = config.maxFileSize;
+    if (sources.some((s) => s.size > maxSize)) throw new ProtocolError("TOO_LARGE");
+    const label =
+      paths.length === 1 ? basename(paths[0]!) : sources.length === 1 ? sources[0]!.name : `${sources.length} files`;
+    const t = await store.createFromLocal(randomId(), label, sources);
+    return store.offers().find((o) => o.transferId === t.id) ?? null;
+  }
+
   route("DELETE", "/api/offers/:id", "host", async ({ res, params }) => {
     await store.cancel(await store.get(params[0]!));
     broadcastOffers();
@@ -343,7 +376,7 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
   route("GET", "/api/offers/:id/files/:id", "public", async (ctx) => {
     requireOfferAccess(ctx);
     const t = await store.get(ctx.params[0]!);
-    const { path, file } = store.outboxFilePath(t, ctx.params[1]!);
+    const { path, file } = await store.outboxFilePath(t, ctx.params[1]!);
     await sendFile(ctx, path, file.name, file.type, file.size, t);
   });
 
@@ -353,11 +386,14 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
     const offer = store.offers().find((o) => o.transferId === t.id);
     if (!offer) throw new ProtocolError("NOT_FOUND");
     const used = new Set<string>();
-    const entries: ZipEntry[] = offer.files.map((f) => {
+    // Resolve (and freshness-check) every file before the 200 goes out: after that an error can only cut the stream.
+    const located = await mapLimit(offer.files, 32, (f) => store.outboxFilePath(t, f.id));
+    const entries: ZipEntry[] = offer.files.map((f, i) => {
       let name = [f.relDir, f.name].filter(Boolean).join("/");
       for (let n = 2; used.has(name.toLowerCase()); n++) name = `${f.name.replace(/(\.[^.]*)?$/, ` (${n})$1`)}`;
       used.add(name.toLowerCase());
-      return { name, path: store.outboxFilePath(t, f.id).path, size: f.size, mtime: new Date() };
+      const { path, file } = located[i]!;
+      return { name, path, size: f.size, mtime: file.source && file.lastModified ? new Date(file.lastModified) : new Date() };
     });
     const archiveName = `${sanitizeFileName(offer.label || "SwiftDrop")}.zip`;
     ctx.res.writeHead(200, {
@@ -366,6 +402,7 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
       "content-disposition": disposition(archiveName),
       "cache-control": "no-store",
     });
+    if (ctx.req.method === "HEAD") return void ctx.res.end();
     let sent = 0;
     const total = zipLength(entries);
     await writeZip(entries, ctx.res, (n) => {
@@ -676,34 +713,22 @@ async function validateDestination(input: string): Promise<string> {
   return dir;
 }
 
-/** Native Windows folder picker, run as the logged-in user who is sitting at this PC. */
-function chooseFolderDialog(current: string): Promise<string | null> {
-  if (process.platform !== "win32") return Promise.reject(new ProtocolError("BAD_REQUEST", "folder picker is Windows-only"));
-  const script = [
-    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
-    "Add-Type -AssemblyName System.Windows.Forms",
-    "$d = New-Object System.Windows.Forms.FolderBrowserDialog",
-    "$d.Description = 'Choose where SwiftDrop saves received files'",
-    "$d.UseDescriptionForTitle = $true",
-    "$d.ShowNewFolderButton = $true",
-    "if (Test-Path -LiteralPath $env:SD_CURRENT) { $d.SelectedPath = $env:SD_CURRENT }",
-    "$owner = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false }",
-    "if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($d.SelectedPath) }",
-  ].join("; ");
-  return new Promise((resolvePromise) => {
-    const child = spawn("powershell.exe", ["-NoProfile", "-STA", "-NonInteractive", "-Command", script], {
-      env: { ...process.env, SD_CURRENT: current },
-      windowsHide: false,
-    });
-    let out = "";
-    child.stdout.on("data", (d: Buffer) => (out += d.toString("utf8")));
-    const timer = setTimeout(() => child.kill(), 5 * 60_000);
-    child.on("close", () => {
-      clearTimeout(timer);
-      resolvePromise(out.trim() || null);
-    });
-    child.on("error", () => resolvePromise(null));
-  });
+function randomId(): string {
+  return randomBytes(12).toString("base64url");
+}
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let i = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (i < items.length) {
+        const k = i++;
+        out[k] = await fn(items[k]!);
+      }
+    }),
+  );
+  return out;
 }
 
 export async function readVersion(): Promise<string> {

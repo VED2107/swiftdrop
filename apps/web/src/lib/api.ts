@@ -70,6 +70,8 @@ export interface HostSettings {
   destination: string;
   maxFileSize: number;
   platform: string;
+  /** The server can open a native file dialog and serve picks in place (no upload). */
+  nativePick: boolean;
 }
 
 export const Api = {
@@ -92,6 +94,7 @@ export const Api = {
   setDestination: (destination: string) => api<HostSettings>("/api/host/settings", { method: "PATCH", json: { destination } }),
   offers: () => api<{ offers: Offer[] }>("/api/offers"),
   ticket: (tid: string) => api<{ ticket: string }>(`/api/offers/${tid}/ticket`, { method: "POST" }),
+  pickOffer: (mode: "files" | "folder") => api<{ offer: Offer | null }>("/api/host/offers/pick", { method: "POST", json: { mode } }),
   removeOffer: (tid: string) => api(`/api/offers/${tid}`, { method: "DELETE" }),
   stats: () => api<{ cpuUserMs: number; cpuSystemMs: number; rss: number; writeLoad: number }>("/api/stats"),
 };

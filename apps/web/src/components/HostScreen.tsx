@@ -53,7 +53,21 @@ export function HostScreen() {
   }, [online.length]);
 
   const canSend = state.devices.length > 0;
-  const openFiles = useCallback(() => filesInput.current?.click(), []);
+  // On Windows the server opens its own file dialog and serves the picks in place: no
+  // browser upload hop (Chromium caps that at ~40 MB/s), the phone reads the originals.
+  const pickNative = useCallback(
+    async (mode: "files" | "folder") => {
+      try {
+        const { offer } = await Api.pickOffer(mode);
+        if (offer) notify(`${offer.label} is ready on ${phone}.`);
+      } catch (e) {
+        notify((e as Error).message, "error");
+      }
+    },
+    [phone],
+  );
+  const openFiles = useCallback(() => (state.nativePick ? void pickNative("files") : filesInput.current?.click()), [state.nativePick, pickNative]);
+  const openFolder = useCallback(() => (state.nativePick ? void pickNative("folder") : folderInput.current?.click()), [state.nativePick, pickNative]);
   const over = useDropAnywhere(canSend && !moving, (p) => setPicked(p));
   const activeJob = reading?.job && !["complete", "cancelled"].includes(reading.job.state) ? reading.job : null;
   useShortcuts({ job: activeJob, onOpen: canSend ? openFiles : null });
@@ -117,7 +131,7 @@ export function HostScreen() {
                 picked={picked}
                 over={over}
                 onChooseFiles={openFiles}
-                onChooseFolder={() => folderInput.current?.click()}
+                onChooseFolder={openFolder}
                 onSend={startSend}
                 onClear={() => setPicked(null)}
                 onReview={() => setReviewing(true)}

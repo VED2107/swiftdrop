@@ -51,7 +51,7 @@ export function App() {
       if (info.role === "host") {
         app.set({ role: "host", phase: "ready" });
         void Api.settings()
-          .then((s) => app.set({ destination: s.destination }))
+          .then((s) => app.set({ destination: s.destination, nativePick: s.nativePick }))
           .catch(() => undefined);
       } else if (info.role === "guest") {
         app.set({ role: "guest", phase: "ready", folderName: info.folderName });

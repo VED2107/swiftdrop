@@ -106,6 +106,10 @@ export const JoinRequestSchema = z.object({
 
 export const ApproveJoinSchema = z.object({ approve: z.boolean() });
 
+export const PickLocalSchema = z.object({ mode: z.enum(["files", "folder"]) });
+/** Host-only: offer files already on the PC, by absolute path (the picker's output). */
+export const OfferLocalSchema = z.object({ paths: z.array(z.string().min(1).max(4096)).min(1).max(10_000) });
+
 export const SettingsPatchSchema = z.object({
   destination: z.string().min(1).max(1024).optional(),
   maxFileSize: z.number().int().positive().optional(),
@@ -211,6 +215,7 @@ export const ERROR_CODES = [
   "TOO_LARGE",
   "DISK_FULL",
   "DISK_WRITE",
+  "SOURCE_CHANGED",
   "CANCELLED",
   "SERVER",
 ] as const;
@@ -231,6 +236,7 @@ export const USER_MESSAGES: Record<ErrorCode, string> = {
   TOO_LARGE: "That file is bigger than this PC accepts. Change the limit in settings.",
   DISK_FULL: "The PC's drive is full. Free up space or choose another folder.",
   DISK_WRITE: "Couldn't save the file. Choose another folder on the PC.",
+  SOURCE_CHANGED: "That file changed on the PC after it was shared. Share it again from the PC.",
   CANCELLED: "Transfer cancelled.",
   SERVER: "The PC hit an unexpected problem. Try again.",
 };
@@ -272,6 +278,7 @@ function defaultStatus(code: ErrorCode): number {
     case "SERVER":
       return 500;
     case "CANCELLED":
+    case "SOURCE_CHANGED":
       return 410;
     default:
       return 400;

@@ -26,6 +26,12 @@ pnpm start          # builds the web app, starts the server on port 8787, opens 
 
 Internet is not needed. Only the two devices and a router/hotspot.
 
+## Phone ↔ Phone (no PC)
+
+Two phones can send to each other directly over WebRTC, with the PC switched off: open `p2p.html` on both (it must be served over **https** — camera and file storage require it), tap **Send** on one and **Receive** on the other, and scan each other's code once. File bytes go phone to phone only; the codes carry connection details, never data. Design, iOS constraints and status: [`docs/PHONE_TO_PHONE.md`](docs/PHONE_TO_PHONE.md).
+
+- Build the standalone page: `pnpm --filter @swiftdrop/web build:p2p` → `apps/web/dist-p2p/` (any static https host; `apps/web/vercel.json` configures Vercel with root `apps/web`).
+
 ## Distribution
 
 SwiftDrop has two deliverables:
@@ -35,7 +41,7 @@ SwiftDrop has two deliverables:
 | **SwiftDrop.exe** | The app. Local server + web UI in one file; runs on the user's Windows PC. | `pnpm build:exe` → `release/SwiftDrop.exe` (Node single executable, ~90 MB). Publish it on GitHub Releases or any file host. |
 | **Landing page** | Marketing + download page (`apps/site`). Static. | Vercel, root directory `apps/site` (config in `apps/site/vercel.json`). |
 
-**Why the app itself can't run on Vercel:** SwiftDrop's server must run on the PC that receives the files — it writes to the local disk, shows the PC's LAN address in the QR code, and phones connect to it over Wi-Fi. A cloud deployment can't reach your disk, would route file bytes through the internet, caps request bodies at ~4.5 MB, and a page served over `https://*.vercel.app` is blocked by browsers from talking to `http://192.168.x.x`. So Vercel serves only the landing page.
+**Why the app itself can't run on Vercel:** SwiftDrop's server must run on the PC that receives the files — it writes to the local disk, shows the PC's LAN address in the QR code, and phones connect to it over Wi-Fi. A cloud deployment can't reach your disk, would route file bytes through the internet, caps request bodies at ~4.5 MB, and a page served over `https://*.vercel.app` is blocked by browsers from talking to `http://192.168.x.x`. So Vercel serves the landing page — and, as a separate project, the static phone-to-phone page (`p2p.html`), which moves no bytes through Vercel: it only delivers the app code.
 
 ### Deploy the landing page on Vercel
 

@@ -37,7 +37,8 @@ const id = z.string().regex(/^[A-Za-z0-9_-]{6,64}$/);
 export const IntegritySchema = z.enum(["xxh64", "sha256"]);
 export const ConflictPolicySchema = z.enum(["ask", "replace", "skip", "keep-both"]);
 export type ConflictPolicy = z.infer<typeof ConflictPolicySchema>;
-export const DirectionSchema = z.enum(["to-host", "to-guest"]);
+/** to-host: phone -> PC. to-guest: PC -> phone. to-peer: phone -> phone, direct (never via the PC). */
+export const DirectionSchema = z.enum(["to-host", "to-guest", "to-peer"]);
 export type Direction = z.infer<typeof DirectionSchema>;
 
 export const FileEntrySchema = z.object({
@@ -206,6 +207,7 @@ export const ERROR_CODES = [
   "FORBIDDEN",
   "PAIRING_EXPIRED",
   "PAIRING_DENIED",
+  "DECLINED",
   "RATE_LIMITED",
   "NOT_FOUND",
   "BAD_REQUEST",
@@ -227,6 +229,7 @@ export const USER_MESSAGES: Record<ErrorCode, string> = {
   FORBIDDEN: "That action isn't allowed from this device.",
   PAIRING_EXPIRED: "That code expired. Ask for a fresh one on the PC.",
   PAIRING_DENIED: "The PC declined the connection.",
+  DECLINED: "The other phone declined the files.",
   RATE_LIMITED: "Too many attempts. Wait a minute and try again.",
   NOT_FOUND: "That transfer no longer exists on the PC.",
   BAD_REQUEST: "Something about that request didn't look right. Try again.",
@@ -260,6 +263,7 @@ function defaultStatus(code: ErrorCode): number {
       return 401;
     case "FORBIDDEN":
     case "PAIRING_DENIED":
+    case "DECLINED":
       return 403;
     case "NOT_FOUND":
     case "PAIRING_EXPIRED":

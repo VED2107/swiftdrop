@@ -8,3 +8,4 @@ playwright-report
 .impeccable/build
 .playwright-mcp
 release
+dist-p2p

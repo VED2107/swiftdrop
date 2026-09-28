@@ -121,6 +121,9 @@ importers:
       '@swiftdrop/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
+      '@swiftdrop/peer':
+        specifier: workspace:*
+        version: link:../../packages/peer
       '@swiftdrop/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -130,9 +133,15 @@ importers:
       '@swiftdrop/transfer-engine':
         specifier: workspace:*
         version: link:../../packages/transfer-engine
+      jsqr:
+        specifier: ^1.4.0
+        version: 1.4.0
       lucide-react:
         specifier: ^0.468.0
         version: 0.468.0(react@19.3.0)
+      qrcode:
+        specifier: ^1.5.4
+        version: 1.5.4
       react:
         specifier: ^19.0.0
         version: 19.3.0
@@ -143,6 +152,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.0.0
         version: 4.3.3(vite@6.4.3(@types/node@22.20.4)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15))
+      '@types/qrcode':
+        specifier: ^1.5.6
+        version: 1.5.6
       '@types/react':
         specifier: ^19.0.0
         version: 19.3.0
@@ -164,6 +176,24 @@ importers:
       hash-wasm:
         specifier: ^4.12.0
         version: 4.12.0
+
+  packages/peer:
+    dependencies:
+      '@swiftdrop/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@swiftdrop/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@swiftdrop/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@swiftdrop/transfer-engine':
+        specifier: workspace:*
+        version: link:../transfer-engine
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
 
   packages/protocol:
     dependencies:
@@ -1252,6 +1282,9 @@ packages:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
     engines: {node: '>=6'}
     hasBin: true
+
+  jsqr@1.4.0:
+    resolution: {integrity: sha512-dxLob7q65Xg2DvstYkRpkYtmKm2sPJ9oFhrhmudT1dZvNFFTlroai3AWSpLey/w5vMcLBXRgOJsbXpdN9HzU/A==}
 
   lightningcss-android-arm64@1.32.0:
     resolution: {integrity: sha512-YK7/ClTt4kAK0vo6w3X+Pnm0D2cf2vPHbhOXdoNti1Ga0al1P4TBZhwjATvjNwLEBCnKvjJc2jQgHXH0NEwlAg==}
@@ -2537,6 +2570,8 @@ snapshots:
   jsesc@3.1.0: {}
 
   json5@2.2.3: {}
+
+  jsqr@1.4.0: {}
 
   lightningcss-android-arm64@1.32.0:
     optional: true

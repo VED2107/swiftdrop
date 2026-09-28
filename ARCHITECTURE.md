@@ -4,7 +4,7 @@
 
 | Option | Verdict | Why |
 |---|---|---|
-| WebRTC DataChannel | rejected | SCTP in userspace: ~20–60 MB/s in Safari, CPU-heavy; ICE host candidates are mDNS-obfuscated and fail on some hotspots/routers; iOS receivers must buffer into a Blob in RAM (multi-GB videos crash the tab). |
+| WebRTC DataChannel | rejected for phone ↔ PC; **used for phone ↔ phone** (no PC, see `docs/PHONE_TO_PHONE.md`) | SCTP in userspace: ~20–60 MB/s in Safari, CPU-heavy; ICE host candidates are mDNS-obfuscated and fail on some hotspots/routers; iOS receivers must buffer into a Blob in RAM (multi-GB videos crash the tab). |
 | WebTransport | rejected | Not available in iOS Safari. |
 | WebSocket for data | rejected | Single TCP stream, message framing overhead, no benefit over HTTP bodies. |
 | **HTTP/1.1 chunk bodies to a server on the PC** | **chosen** | Kernel TCP congestion control and buffers, up to 6 parallel connections per host in every browser, binary bodies with zero encoding, native downloads on iOS (disk-streamed), works offline. |

@@ -1,7 +1,7 @@
 {
   "name": "swiftdrop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "packageManager": "pnpm@11.1.1",
   "engines": {
@@ -21,23 +21,27 @@
     "bench:disk": "tsx tests/performance/disk-bench.ts",
     "bench:browser": "tsx tests/performance/browser-bench.ts",
     "bench:primitives": "tsx tests/performance/primitives.ts",
-    "bench:check": "tsx tests/performance/bench.ts --check"
+    "bench:check": "tsx tests/performance/bench.ts --check",
+    "build:installer": "node scripts/build-installer.mjs",
+    "build:icons": "node scripts/build-icons.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
+    "@swiftdrop/crypto": "workspace:*",
+    "@swiftdrop/protocol": "workspace:*",
+    "@swiftdrop/server": "workspace:*",
+    "@swiftdrop/shared": "workspace:*",
+    "@swiftdrop/transfer-engine": "workspace:*",
     "@types/node": "^22.10.0",
+    "@types/yauzl": "^2.10.3",
     "concurrently": "^9.1.0",
+    "esbuild": "^0.25.0",
+    "innosetup-compiler": "^6.3.1",
+    "postject": "1.0.0-alpha.6",
+    "rcedit": "^5.0.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8",
-    "yauzl": "^3.2.0",
-    "@types/yauzl": "^2.10.3",
-    "@swiftdrop/protocol": "workspace:*",
-    "@swiftdrop/shared": "workspace:*",
-    "@swiftdrop/crypto": "workspace:*",
-    "@swiftdrop/transfer-engine": "workspace:*",
-    "@swiftdrop/server": "workspace:*",
-    "esbuild": "^0.25.0",
-    "postject": "1.0.0-alpha.6"
+    "yauzl": "^3.2.0"
   }
 }

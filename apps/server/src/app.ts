@@ -34,7 +34,7 @@ import { expandPaths, pickDialog, type PickMode } from "./picker.ts";
 import { TransferStore, type TransferRec } from "./store.ts";
 import { writeZip, zipLength, type ZipEntry } from "./zip.ts";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
 type Role = "host" | "guest";
 interface Ctx {

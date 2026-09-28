@@ -9,7 +9,7 @@
  * 4. inject the blob into a copy of the running node.exe (postject)
  */
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -82,6 +82,26 @@ if (process.platform === "win32") {
     /* signtool not installed: the exe still runs, just unsigned-with-broken-signature */
   }
 }
+// Icon + version resources, before the blob goes in (rcedit rewrites the resource section).
+if (process.platform === "win32") {
+  const { rcedit } = await import("rcedit");
+  const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
+  await rcedit(out, {
+    icon: join(root, "assets", "brand", "swiftdrop.ico"),
+    "file-version": version,
+    "product-version": version,
+    "version-string": {
+      ProductName: "SwiftDrop",
+      FileDescription: "SwiftDrop — fast local file transfer",
+      CompanyName: "SwiftDrop",
+      LegalCopyright: `© ${new Date().getFullYear()} SwiftDrop`,
+      OriginalFilename: "SwiftDrop.exe",
+      InternalName: "SwiftDrop",
+    },
+  });
+  console.log(`› icon + version ${version} resources`);
+}
+
 run("npx", [
   "postject",
   out,

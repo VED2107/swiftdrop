@@ -52,8 +52,12 @@ SwiftDrop has two deliverables:
 ### Build the Windows app
 
 ```powershell
-pnpm build:exe          # release/SwiftDrop.exe
+pnpm build:exe          # release/SwiftDrop.exe (icon + version info embedded)
+pnpm build:installer    # also release/SwiftDrop-Setup-<version>.exe
+pnpm build:icons        # re-render every icon from assets/brand/*.svg
 ```
+
+The installer (Inno Setup, compiler comes from `node_modules`) installs per user with no admin prompt, adds a Start menu entry and optional desktop shortcut, and cleanly uninstalls from *Installed apps*. Choosing **Install for all users** also adds the inbound firewall rule for private networks, so phones connect without Windows asking. Settings, pairings and received files are never removed by the uninstaller.
 
 Double-click to run: it opens the browser, stores settings in `%USERPROFILE%\.swiftdrop`, and a second launch just reopens the running instance. The exe is unsigned, so SmartScreen warns on first run until it's code-signed.
 

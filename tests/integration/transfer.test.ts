@@ -408,6 +408,8 @@ function tinyController() {
     targetLatencyMs: [250, 900] as [number, number],
     gainThreshold: 0.05,
     holdSamples: 10,
+    minCompletions: 6,
+    maxWindowSamples: 4,
     settleSamples: 1,
   };
 }

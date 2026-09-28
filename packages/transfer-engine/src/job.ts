@@ -702,6 +702,7 @@ export class TransferJob {
     const decision = this.controller.update({
       throughput,
       avgLatencyMs: this.sampleLatencyCount ? this.sampleLatencySum / this.sampleLatencyCount : 0,
+      completed: this.sampleLatencyCount,
       errors: this.sampleErrors,
       serverLoad: this.sampleLoad,
     });

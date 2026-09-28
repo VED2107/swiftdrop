@@ -15,6 +15,15 @@
  *   overhead dominates (grow); too long means coarse progress, slow recovery and
  *   more memory in flight (shrink). Always bounded by the memory budget.
  *
+ * Judging — enough evidence first:
+ *   throughput is only as precise as the number of requests that finished. With 16 MiB
+ *   chunks at phone speeds a 1 s sample holds 3–6 completions, so one request landing
+ *   just before or after the boundary moves it by ±20%: enough to fake a probe's gain or
+ *   loss. Samples are pooled into a window until it holds `minCompletions` finished
+ *   requests (or `maxWindowSamples` samples, so a slow link still gets judged), and every
+ *   probe/hold/collapse decision uses the window mean. Errors and receiver pressure still
+ *   act on the very next sample.
+ *
  * Pure and clock-free: feed it samples, read its decisions. That keeps it testable.
  */
 
@@ -31,8 +40,12 @@ export interface ControllerConfig {
   targetLatencyMs: [low: number, high: number];
   /** Relative throughput gain required to keep a probe. */
   gainThreshold: number;
-  /** Samples to hold at the best level before re-probing. */
+  /** Judgements (windows) to hold at the best level before re-probing. */
   holdSamples: number;
+  /** Finished requests a window needs before its throughput is trusted. */
+  minCompletions: number;
+  /** A window is judged after this many samples even if short of `minCompletions`. */
+  maxWindowSamples: number;
   /** Samples to wait after any change before judging it. */
   settleSamples: number;
 }
@@ -42,6 +55,8 @@ export interface ControllerSample {
   throughput: number;
   /** mean request latency in the interval, ms (0 when no request finished) */
   avgLatencyMs: number;
+  /** requests that finished in the interval */
+  completed: number;
   /** failed requests in the interval */
   errors: number;
   /** max receiver load hint in the interval, 0..1 */
@@ -50,6 +65,7 @@ export interface ControllerSample {
 
 export type ControllerReason =
   | "settling"
+  | "measuring"
   | "probe-up"
   | "probe-kept"
   | "probe-reverted"
@@ -78,6 +94,8 @@ export const DESKTOP_CONTROLLER: ControllerConfig = {
   gainThreshold: 0.05,
   holdSamples: 10,
   settleSamples: 1,
+  minCompletions: 6,
+  maxWindowSamples: 4,
 };
 
 export const MOBILE_CONTROLLER: ControllerConfig = {
@@ -98,7 +116,7 @@ export class AdaptiveController {
   private bestThroughput = 0;
   private settle: number;
   private held = 0;
-  private smoothed = 0;
+  private window = { sum: 0, samples: 0, completed: 0 };
 
   constructor(config: ControllerConfig) {
     this.config = config;
@@ -111,10 +129,6 @@ export class AdaptiveController {
 
   update(s: ControllerSample): ControllerDecision {
     const c = this.config;
-    // EWMA damps single-interval spikes so one lucky second doesn't lock in a level.
-    this.smoothed = this.smoothed === 0 ? s.throughput : this.smoothed * 0.5 + s.throughput * 0.5;
-    const tput = this.smoothed;
-
     if (s.errors > 0) {
       this.streams = Math.max(c.minStreams, Math.floor(this.streams / 2));
       this.blocksPerChunk = Math.max(c.minBlocks, Math.floor(this.blocksPerChunk / 2));
@@ -136,6 +150,14 @@ export class AdaptiveController {
       this.settle--;
       return this.decision("settling");
     }
+
+    const w = this.window;
+    w.sum += s.throughput;
+    w.samples++;
+    w.completed += s.completed;
+    if (w.completed < c.minCompletions && w.samples < c.maxWindowSamples) return this.decision("measuring");
+    const tput = w.sum / w.samples;
+    this.window = { sum: 0, samples: 0, completed: 0 };
 
     if (this.phase === "probing") {
       if (this.baseline === 0) {
@@ -213,8 +235,8 @@ export class AdaptiveController {
 
   private after(reason: ControllerReason): ControllerDecision {
     this.settle = this.config.settleSamples;
-    // A new level gets a fresh measurement; carrying the old average would fake a gain.
-    this.smoothed = 0;
+    // A new level gets a fresh measurement; carrying the old window would fake a gain.
+    this.window = { sum: 0, samples: 0, completed: 0 };
     this.fitMemory();
     return this.decision(reason);
   }

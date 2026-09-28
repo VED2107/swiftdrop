@@ -9,6 +9,7 @@ const MB = 1_000_000;
 const sample = (throughput: number, extra: Partial<ControllerSample> = {}): ControllerSample => ({
   throughput,
   avgLatencyMs: 500,
+  completed: 10,
   errors: 0,
   serverLoad: 0,
   ...extra,
@@ -70,6 +71,36 @@ describe("AdaptiveController", () => {
     c.update(sample(5 * MB));
     expect(["reprobe", "probe-reverted", "probe-up"]).toContain(d.reason);
     expect(c.streams).toBeLessThanOrEqual(held);
+  });
+
+  it("waits for enough finished requests before judging a level", () => {
+    const c = new AdaptiveController({ ...DESKTOP_CONTROLLER, settleSamples: 0 });
+    // 2 completions per sample: needs 3 samples to reach 6
+    expect(c.update(sample(50 * MB, { completed: 2 })).reason).toBe("measuring");
+    expect(c.update(sample(50 * MB, { completed: 2 })).reason).toBe("measuring");
+    expect(c.update(sample(50 * MB, { completed: 2 })).reason).toBe("probe-up");
+    // a trickle still gets judged after maxWindowSamples
+    const slow = new AdaptiveController({ ...DESKTOP_CONTROLLER, settleSamples: 0 });
+    const reasons = Array.from({ length: 4 }, () => slow.update(sample(2 * MB, { completed: 0, avgLatencyMs: 3000 })).reason);
+    expect(reasons).toEqual(["measuring", "measuring", "measuring", "probe-up"]);
+  });
+
+  it("is not fooled by request-boundary quantization at phone speeds", () => {
+    // Link saturates at 3 streams. Each 1 s sample holds ~3 completions of big chunks, so
+    // whether a request lands just before or after the boundary swings a sample by ±25%.
+    for (const phase of [0, 1]) {
+      const c = new AdaptiveController({ ...DESKTOP_CONTROLLER, settleSamples: 1 });
+      let changes = 0;
+      for (let i = 0; i < 80; i++) {
+        const noise = (i + phase) % 2 === 0 ? 1.25 : 0.75;
+        const before = c.streams;
+        c.update(sample(link(c.streams, 3, 10 * MB) * noise, { completed: 3, avgLatencyMs: 600 }));
+        if (c.streams !== before) changes++;
+      }
+      expect(c.streams).toBe(3);
+      // climb 3→4, revert, then periodic re-probes (up + back) only
+      expect(changes).toBeLessThanOrEqual(8);
+    }
   });
 });
 

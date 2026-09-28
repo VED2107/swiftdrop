@@ -98,6 +98,11 @@ interface Flight {
   intentional: boolean;
 }
 
+/** A request body read and hashed ahead of its send. */
+type Prepared =
+  | { kind: "blocks"; body: Uint8Array<ArrayBuffer>; hashes: string }
+  | { kind: "batch"; frame: Blob };
+
 interface HashStore {
   digests: Uint8Array;
   known: Bitset;
@@ -128,6 +133,12 @@ export class TransferJob {
   private readonly meter: SpeedMeter;
   private readonly fileMeter: SpeedMeter;
   private readonly flights = new Set<Flight>();
+  /**
+   * Read-ahead: the next request's body, read and hashed while every stream is busy on
+   * the wire, so a finished request is replaced by one that can go out immediately.
+   * Counted in the in-flight memory budget.
+   */
+  private ahead: { item: WorkItem; bytes: number; data: Promise<Prepared> | null } | null = null;
   private readonly hashes = new Map<number, HashStore>();
   private readonly listeners = new Set<(job: TransferJob) => void>();
   private hasher: BlockHasher | null = null;
@@ -379,20 +390,50 @@ export class TransferJob {
   private pump() {
     if (this._state !== "running") return;
     while (this.flights.size < this.controller.streams) {
+      if (this.ahead) {
+        const { item, bytes, data } = this.ahead;
+        this.ahead = null;
+        this.inflightBytes -= bytes; // launch() counts it again as a flight
+        this.launch(item, data);
+        continue;
+      }
       const item = this.planner.next(this.controller.blocksPerChunk);
       if (!item) break;
       this.launch(item);
     }
-    if (this.flights.size === 0 && this.planner.finished) this.finish();
+    this.readAhead();
+    if (this.flights.size === 0 && !this.ahead && this.planner.finished) this.finish();
   }
 
-  private launch(item: WorkItem) {
+  private readAhead() {
+    if (this.ahead || this._state !== "running" || this.flights.size < this.controller.streams) return;
+    const cfg = this.controller.config;
+    // Only when the next chunk fits the memory budget next to everything already in flight.
+    if (this.inflightBytes + this.controller.blocksPerChunk * cfg.blockSize > cfg.memoryBudget) return;
+    const item = this.planner.next(this.controller.blocksPerChunk);
+    if (!item) return;
+    const bytes = itemBytes(item, this.files);
+    const data = item.kind === "complete" ? null : this.prepare(item);
+    data?.catch(() => undefined); // surfaces when the item is launched
+    this.ahead = { item, bytes, data };
+    this.inflightBytes += bytes;
+    if (this.inflightBytes > this.peakInflightBytes) this.peakInflightBytes = this.inflightBytes;
+  }
+
+  private dropAhead() {
+    if (!this.ahead) return;
+    this.planner.release(this.ahead.item);
+    this.inflightBytes -= this.ahead.bytes;
+    this.ahead = null;
+  }
+
+  private launch(item: WorkItem, data: Promise<Prepared> | null = null) {
     const bytes = itemBytes(item, this.files);
     const flight: Flight = { item, ac: new AbortController(), startedAt: this.now(), bytes, intentional: false };
     this.flights.add(flight);
     this.inflightBytes += bytes;
     if (this.inflightBytes > this.peakInflightBytes) this.peakInflightBytes = this.inflightBytes;
-    this.execute(flight)
+    this.execute(flight, data)
       .catch((err: unknown) => this.onFlightError(flight, err))
       .finally(() => {
         this.flights.delete(flight);
@@ -401,42 +442,26 @@ export class TransferJob {
       });
   }
 
-  private async execute(flight: Flight): Promise<void> {
-    const { item } = flight;
+  /** Read + hash (+ frame) a request body. No network. */
+  private async prepare(item: Exclude<WorkItem, { kind: "complete" }>): Promise<Prepared> {
     const hasher = this.hasher!;
     const st = this.stages;
-    if (item.kind === "complete") {
-      const t0 = this.now();
-      await this.completeFile(item);
-      st.completeMs += this.now() - t0;
-      return;
-    }
     if (item.kind === "blocks") {
       const src = this.files[item.file.index]!;
       const from = item.start * BLOCK_SIZE;
       const to = Math.min(src.size, (item.start + item.count) * BLOCK_SIZE);
-      let t = this.now();
+      const t = this.now();
       const body = new Uint8Array(await src.blob.slice(from, to).arrayBuffer());
-      if (flight.ac.signal.aborted) throw new TransportError("CANCELLED");
-      let t2 = this.now();
+      const t2 = this.now();
       st.readMs += t2 - t;
       const digests = hasher.hashBlocks(body, BLOCK_SIZE);
       this.storeHashes(item.file, item.start, digests);
       const hashes = bytesToBase64Url(digests);
-      t = this.now();
-      st.hashMs += t - t2;
-      const { load } = await this.transport.putBlocks(this.id, item.file.id, item.start, body, hashes, flight.ac.signal);
-      t2 = this.now();
-      st.networkMs += t2 - t;
-      this.wireBytes += body.byteLength + hashes.length;
-      this.recordSuccess(body.byteLength, t2 - t, load);
-      this.planner.ack(item);
-      return;
+      st.hashMs += this.now() - t2;
+      return { kind: "blocks", body, hashes };
     }
-
     let t = this.now();
     const buffers = await Promise.all(item.files.map((f) => this.files[f.index]!.blob.arrayBuffer()));
-    if (flight.ac.signal.aborted) throw new TransportError("CANCELLED");
     let t2 = this.now();
     st.readMs += t2 - t;
     const entries = item.files.map((f, i) => ({
@@ -456,17 +481,41 @@ export class TransferJob {
       flat.set(new Uint8Array(b), at);
       at += b.byteLength;
     }
-    const frame = new Blob([flat]);
     t2 = this.now();
     st.frameMs += t2 - t;
-    const { load } = await this.transport.putBatch(this.id, frame, flight.ac.signal);
-    t = this.now();
-    st.networkMs += t - t2;
-    this.wireBytes += frame.size;
-    this.recordSuccess(item.bytes, t - t2, load);
+    return { kind: "batch", frame: new Blob([flat]) };
+  }
+
+  private async execute(flight: Flight, ready: Promise<Prepared> | null): Promise<void> {
+    const { item } = flight;
+    const st = this.stages;
+    if (item.kind === "complete") {
+      const t0 = this.now();
+      await this.completeFile(item);
+      st.completeMs += this.now() - t0;
+      return;
+    }
+    const p = await (ready ?? this.prepare(item));
+    if (flight.ac.signal.aborted) throw new TransportError("CANCELLED");
+    const t = this.now();
+    if (p.kind === "blocks") {
+      const { load } = await this.transport.putBlocks(this.id, (item as Extract<WorkItem, { kind: "blocks" }>).file.id, (item as Extract<WorkItem, { kind: "blocks" }>).start, p.body, p.hashes, flight.ac.signal);
+      const t2 = this.now();
+      st.networkMs += t2 - t;
+      this.wireBytes += p.body.byteLength + p.hashes.length;
+      this.recordSuccess(p.body.byteLength, t2 - t, load);
+      this.planner.ack(item);
+      return;
+    }
+    const batch = item as Extract<WorkItem, { kind: "batch" }>;
+    const { load } = await this.transport.putBatch(this.id, p.frame, flight.ac.signal);
+    const t2 = this.now();
+    st.networkMs += t2 - t;
+    this.wireBytes += p.frame.size;
+    this.recordSuccess(batch.bytes, t2 - t, load);
     this.planner.ack(item);
-    this.filesDone += item.files.length;
-    this.fileMeter.add(item.files.length);
+    this.filesDone += batch.files.length;
+    this.fileMeter.add(batch.files.length);
   }
 
   private recordSuccess(bytes: number, latency: number, load: number) {
@@ -616,6 +665,7 @@ export class TransferJob {
   }
 
   private abortAll() {
+    this.dropAhead();
     for (const f of this.flights) {
       f.intentional = true;
       f.ac.abort();

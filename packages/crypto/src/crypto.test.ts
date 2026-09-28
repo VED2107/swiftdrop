@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createNodeBlockHasher } from "./node.ts";
 import { base64UrlToBytes, bytesToBase64Url, CODE_ALPHABET, createBlockHasher, randomCode, randomToken, safeEqual } from "./index.ts";
 
 describe("tokens", () => {
@@ -48,5 +49,16 @@ describe("block hasher", () => {
     const d = h.hashBlocks(new TextEncoder().encode("abc"), 1024);
     const hex = Array.from(d, (b) => b.toString(16).padStart(2, "0")).join("");
     expect(hex).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  });
+  it("node:crypto sha256 matches the wasm digests the browser sends", async () => {
+    const wasm = await createBlockHasher("sha256");
+    const native = await createNodeBlockHasher("sha256");
+    for (const size of [0, 1, 999, 1000, 2500]) {
+      const data = new Uint8Array(size).map((_, i) => (i * 31) & 255);
+      const a = wasm.hashBlocks(data, 1000);
+      expect(Array.from(native.hashBlocks(data, 1000))).toEqual(Array.from(a));
+      expect(native.root(a)).toBe(wasm.root(a));
+    }
+    expect((await createNodeBlockHasher("xxh64")).algo).toBe("xxh64");
   });
 });

@@ -1,0 +1,40 @@
+{
+  "at": "2026-09-28T19:06:02.715Z",
+  "rev": "adc322f+dirty",
+  "node": "v24.13.0",
+  "tag": "nodesha-before",
+  "rows": [
+    {
+      "id": "B",
+      "scenario": "1 GB file",
+      "state": "complete",
+      "seconds": 7,
+      "MBs": 143.5,
+      "filesPerSec": 0,
+      "p50MBs": 138.1,
+      "p95MBs": 155.3,
+      "streams": 3,
+      "chunkMiB": 16,
+      "peakInflightMiB": 64,
+      "requests": 95,
+      "prepareMs": 10,
+      "latP50ms": 126,
+      "latP95ms": 334,
+      "retries": 0,
+      "senderCpuPct": 120,
+      "receiverCpuPct": 113,
+      "senderRssMB": 423,
+      "receiverRssMB": 193,
+      "sRead": 8,
+      "sHash": 23,
+      "sFrame": 0,
+      "sNet": 69,
+      "sComplete": 0,
+      "rRecvMsPerGB": 1963,
+      "rHashMsPerGB": 5233,
+      "rWriteMsPerGB": 0,
+      "rPeakQueueMiB": 0,
+      "rWriteP95ms": 0
+    }
+  ]
+}

@@ -137,7 +137,7 @@ NTFS ceiling, one folder                          ~3,000–3,200 creates/s at pa
 | 3 | ✅ Conflict check with one `readdir` per target folder instead of one `stat` per file | 451–660 ms prepare for 10k files | done: prepare 660 → 174–270 ms (`bench-disk-xxh64-dup-*.json`) |
 | 4 | Read-ahead: prepare the next chunk while the current one is on the wire | sender read+hash = 16% of request life; connections capped at 6 | fills idle connection time when streams are at the cap |
 | 5 | Controller judges probes on ≥N completed requests, not a fixed 1 s window | 16 MiB chunks at phone speeds = 3–6 completions/s → ±20% quantization noise | fewer false probes/reverts on real Wi-Fi |
-| 6 | `node:crypto` sha256 on the receiver | 437 vs 219 MB/s | 2× receiver headroom with SHA-256 integrity |
+| 6 | ✅ `node:crypto` sha256 on the receiver | 437 vs 219 MB/s | done: receiver hash 5,233 → 2,578 ms/GB (`bench-sink-sha256-nodesha-*.json`); end-to-end SHA-256 stays sender-bound (browser wasm) |
 | 7 | Adaptive resume-state persist interval | full JSON rewrite every 1 s (50k files ≈ MBs per second) | lower receiver CPU on huge file counts |
 
 ## 7. Benchmark methodology

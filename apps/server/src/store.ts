@@ -2,7 +2,8 @@ import { constants as FS, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { mkdir, open, readdir, readFile, rename, rm, rmdir, stat, statfs, writeFile, type FileHandle } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
-import { base64UrlToBytes, bytesToBase64Url, createBlockHasher, HASH_LENGTH, type BlockHasher, type HashAlgo } from "@swiftdrop/crypto";
+import { base64UrlToBytes, bytesToBase64Url, HASH_LENGTH, type BlockHasher, type HashAlgo } from "@swiftdrop/crypto";
+import { createNodeBlockHasher } from "@swiftdrop/crypto/node";
 import {
   BLOCK_SIZE,
   MAX_BLOCKS_PER_CHUNK,
@@ -683,7 +684,7 @@ export class TransferStore {
   private async hasher(algo: HashAlgo): Promise<BlockHasher> {
     let h = this.hashers.get(algo);
     if (!h) {
-      h = await createBlockHasher(algo);
+      h = await createNodeBlockHasher(algo);
       this.hashers.set(algo, h);
     }
     return h;

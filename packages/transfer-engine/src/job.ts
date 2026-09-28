@@ -447,7 +447,16 @@ export class TransferJob {
     t = this.now();
     st.hashMs += t - t2;
     const header = encodeBatchHeader({ files: entries });
-    const frame = new Blob([header, ...buffers]);
+    // One contiguous part: a Blob of hundreds of small parts uploads ~2x slower (measured,
+    // tests/performance/body-shapes.ts) and costs the receiver 5x longer to pull off the socket.
+    const flat = new Uint8Array(header.byteLength + item.bytes);
+    flat.set(header, 0);
+    let at = header.byteLength;
+    for (const b of buffers) {
+      flat.set(new Uint8Array(b), at);
+      at += b.byteLength;
+    }
+    const frame = new Blob([flat]);
     t2 = this.now();
     st.frameMs += t2 - t;
     const { load } = await this.transport.putBatch(this.id, frame, flight.ac.signal);

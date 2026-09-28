@@ -188,6 +188,29 @@ describe("duplicates", () => {
     expect((await readFile(join(s.dirs.dest, "dup (1).jpg"))).length).toBe(2000);
     expect(await readFile(join(s.dirs.dest, "dup2.jpg"), "utf8")).toBe("existing");
   });
+
+  it("finds clashes in nested folders, ignores same-named folders, respects the OS's case rules", async () => {
+    await mkdir(join(s.dirs.dest, "Album", "sub.jpg"), { recursive: true }); // a folder, not a file
+    await writeFile(join(s.dirs.dest, "Album", "photo.jpg"), "existing");
+    const clash = source(process.platform === "linux" ? "photo.jpg" : "PHOTO.JPG", bytes(100, 13), "Album");
+    const folderNamed = source("sub.jpg", bytes(100, 14), "Album");
+    const fresh = Array.from({ length: 50 }, (_, i) => source(`new_${i}.jpg`, bytes(100, 100 + i), "Album"));
+    let asked: string[] = [];
+    const job = new TransferJob({
+      transport: guestTransport(s, token),
+      files: [clash, folderNamed, ...fresh],
+      direction: "to-host",
+      label: "n",
+      resolveConflicts: async (conflicts) => {
+        asked = conflicts.map((c) => c.name);
+        return { [clash.id]: "skip" };
+      },
+    });
+    await job.start();
+    await job.done;
+    expect(asked).toEqual([`Album/${clash.name}`]);
+    expect(job.snapshot().filesSkipped).toBe(1);
+  });
 });
 
 describe("security", () => {

@@ -214,11 +214,25 @@ export class TransferStore {
       digests: null,
     }));
 
-    // Duplicate detection by metadata only: an existing file with the same name.
+    // Duplicate detection by metadata only: an existing file with the same name. One
+    // readdir per target folder instead of one stat per file; only real clashes get a stat.
     if (input.direction === "to-host" && !input.bench) {
       const conflicts: Conflict[] = [];
-      await forEachLimit(files, 32, async (f) => {
-        const target = this.safeJoin(root, [...f.relDir, f.name]);
+      const byDir = new Map<string, FileRec[]>();
+      for (const f of files) {
+        const dir = this.safeJoin(root, f.relDir);
+        const list = byDir.get(dir);
+        if (list) list.push(f);
+        else byDir.set(dir, [f]);
+      }
+      const clashes: Array<{ f: FileRec; target: string }> = [];
+      await forEachLimit([...byDir], 8, async ([dir, list]) => {
+        const names = await readdir(dir).catch(() => null);
+        if (!names?.length) return;
+        const present = new Set(names.map(nameKey));
+        for (const f of list) if (present.has(nameKey(f.name))) clashes.push({ f, target: join(dir, f.name) });
+      });
+      await forEachLimit(clashes, 32, async ({ f, target }) => {
         const st = await stat(target).catch(() => null);
         if (!st?.isFile()) return;
         const decision = input.decisions[f.id] ?? (input.onConflict === "ask" ? undefined : input.onConflict);
@@ -867,6 +881,9 @@ function hideOnWindows(dir: string) {
   if (process.platform !== "win32") return;
   spawn("attrib", ["+h", dir], { stdio: "ignore", windowsHide: true }).on("error", () => undefined);
 }
+
+/** Windows and macOS match file names case-insensitively; both sides are already NFC. */
+const nameKey = process.platform === "win32" || process.platform === "darwin" ? (n: string) => n.toLowerCase() : (n: string) => n;
 
 function relName(root: string, target: string): string {
   return target.slice(root.length + 1).split(sep).join("/");

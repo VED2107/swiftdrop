@@ -1,6 +1,6 @@
 # SwiftDrop performance audit
 
-Status: **measurement phase complete, optimizations not yet applied.** Everything below was measured on one machine; nothing is estimated. Where a question could not be measured here (iPhone Safari, real Wi-Fi), that is said explicitly.
+Status: **measurement phase complete; optimizations being applied (✅ in §6).** Everything below was measured on one machine; nothing is estimated. Where a question could not be measured here (iPhone Safari, real Wi-Fi), that is said explicitly.
 
 Test machine: Intel i5-10300H (4C/8T), 17 GB RAM, NVMe system drive (NTFS, Windows 11, Defender on), Node v24.13.0, Chromium 153 headless.
 
@@ -132,9 +132,9 @@ NTFS ceiling, one folder                          ~3,000–3,200 creates/s at pa
 
 | # | Change | Evidence | Expected effect |
 |---|---|---|---|
-| 1 | Investigate the Chromium upload ceiling; for PC → phone, let the server read the picked file itself instead of staging through a browser upload | 40 MB/s browser vs 520 MB/s Node into the same server | up to ~10× on the PC → phone staging hop |
-| 2 | Batch body as one contiguous buffer (read each small file into its slot) | multi-part body 5× slower to arrive in Node; equal in Chromium | small files toward the store's 2,740 files/s |
-| 3 | Conflict check with one `readdir` per target folder instead of one `stat` per file | 451 ms prepare for 10k files | −7% on 10k-file transfers, more on slow disks |
+| 1 | ✅ For PC → phone, let the server read the picked file itself instead of staging through a browser upload | 40 MB/s browser vs 520 MB/s Node into the same server | done: native dialog, served in place; 1 GB offer ready in 18 ms instead of ~27 s (`native-offer-1gb.json`). The Chromium upload ceiling itself is still unexplained and still applies to drag-and-drop. |
+| 2 | ✅ Batch body as one contiguous buffer | multi-part body 5× slower to arrive in Node; equal in Chromium | done: 10k × 50 KB 232 → 314 MB/s sink, 78 → 95 MB/s disk (`*-contig.json`) |
+| 3 | ✅ Conflict check with one `readdir` per target folder instead of one `stat` per file | 451–660 ms prepare for 10k files | done: prepare 660 → 174–270 ms (`bench-disk-xxh64-dup-*.json`) |
 | 4 | Read-ahead: prepare the next chunk while the current one is on the wire | sender read+hash = 16% of request life; connections capped at 6 | fills idle connection time when streams are at the cap |
 | 5 | Controller judges probes on ≥N completed requests, not a fixed 1 s window | 16 MiB chunks at phone speeds = 3–6 completions/s → ±20% quantization noise | fewer false probes/reverts on real Wi-Fi |
 | 6 | `node:crypto` sha256 on the receiver | 437 vs 219 MB/s | 2× receiver headroom with SHA-256 integrity |

@@ -33,6 +33,21 @@ export const canShareFiles = (files: File[]) => {
 };
 
 /** Storage can throw in private mode; never let that break the app. */
+/**
+ * Stable per-browser id, sent when pairing so the PC keeps one entry per phone however
+ * often it re-pairs (e.g. after "Disconnect" or cleared site data token).
+ */
+export function installId(): string {
+  let id = storage.get<string>("sd.installId");
+  if (!id || !/^[A-Za-z0-9_-]{16,64}$/.test(id)) {
+    const b = new Uint8Array(18);
+    crypto.getRandomValues(b);
+    id = btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    storage.set("sd.installId", id);
+  }
+  return id;
+}
+
 export const storage = {
   get<T>(key: string): T | null {
     try {

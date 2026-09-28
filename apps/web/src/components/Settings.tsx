@@ -1,4 +1,4 @@
-import { FolderOpen, Lock, Monitor, Smartphone } from "lucide-react";
+import { Check, FolderOpen, Lock, Monitor, Pencil, Smartphone, X } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Api, setToken, type Pairing } from "../lib/api.ts";
 import { deviceLabel } from "../lib/env.ts";
@@ -60,8 +60,8 @@ export function HostSettings({ onClose }: { onClose: () => void }) {
             {devices.map((d) => (
               <div key={d.id} className="row" style={{ gridTemplateColumns: "32px 1fr auto" }}>
                 <Smartphone size={18} strokeWidth={1.5} style={{ color: "var(--text-3)" }} />
-                <div>
-                  <div style={{ fontWeight: 500 }}>{d.name}</div>
+                <div className="min-w-0">
+                  <EditableName name={d.name} label={`Rename ${d.name}`} onSave={(n) => Api.renameDevice(d.id, n)} />
                   <div className="t-small flex items-center gap-2">
                     <span className="dot" data-state={d.online ? "live" : undefined} /> {d.online ? "Connected" : "Paired"}
                   </div>
@@ -109,10 +109,72 @@ export function HostSettings({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** Click to rename; Enter saves, Escape cancels. Server enforces unique names. */
+function EditableName({ name, label, onSave }: { name: string; label: string; onSave: (name: string) => Promise<unknown> }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(name);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setValue(name), [name]);
+  const save = async () => {
+    const v = value.trim();
+    if (!v || v === name) return setEditing(false);
+    setBusy(true);
+    try {
+      await onSave(v);
+      setEditing(false);
+    } catch (e) {
+      notify((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (!editing)
+    return (
+      <button type="button" className="flex items-center gap-2 bg-transparent border-0 p-0 cursor-pointer text-left" style={{ fontWeight: 500, color: "var(--text)" }} aria-label={label} onClick={() => setEditing(true)}>
+        <span className="truncate">{name}</span>
+        <Pencil size={13} strokeWidth={1.75} style={{ color: "var(--text-3)", flex: "none" }} />
+      </button>
+    );
+  return (
+    <form
+      className="flex items-center gap-1"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void save();
+      }}
+    >
+      <input
+        className="field flex-1 min-w-0"
+        autoFocus
+        maxLength={40}
+        aria-label={label}
+        value={value}
+        disabled={busy}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && (setValue(name), setEditing(false))}
+      />
+      <button className="btn btn-ghost btn-sm" type="submit" aria-label="Save name" disabled={busy}>
+        <Check size={15} />
+      </button>
+      <button className="btn btn-ghost btn-sm" type="button" aria-label="Cancel" onClick={() => (setValue(name), setEditing(false))}>
+        <X size={15} />
+      </button>
+    </form>
+  );
+}
+
 export function GuestSettings({ onClose, onForget }: { onClose: () => void; onForget: () => void }) {
   const folder = useApp((s) => s.folderName);
+  const deviceId = useApp((s) => s.deviceId);
+  const devices = useApp((s) => s.devices);
+  const [myName, setMyName] = useState<string | null>(null);
+  useEffect(() => void Api.info().then((i) => setMyName(i.deviceName)).catch(() => undefined), [deviceId, devices]);
   return (
     <Sheet title="Settings" onClose={onClose}>
+      <Group title="This phone">
+        {myName && <EditableName name={myName} label="Rename this phone" onSave={(n) => Api.renameSelf(n).then((d) => setMyName(d.name))} />}
+        <p className="t-small">The name your PC shows for this phone.</p>
+      </Group>
       <Group title="Connected to">
         <div className="flex items-center gap-3">
           <Monitor size={18} strokeWidth={1.5} style={{ color: "var(--text-3)" }} />

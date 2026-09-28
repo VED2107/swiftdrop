@@ -1,0 +1,40 @@
+{
+  "at": "2026-09-28T19:28:25.747Z",
+  "sizeMb": 256,
+  "rows": [
+    {
+      "hwKiB": 256,
+      "frameKiB": 16,
+      "MBs": 10.9
+    },
+    {
+      "hwKiB": 256,
+      "frameKiB": 64,
+      "MBs": 10.4
+    },
+    {
+      "hwKiB": 1024,
+      "frameKiB": 64,
+      "MBs": 11.9
+    },
+    {
+      "hwKiB": 4096,
+      "frameKiB": 64,
+      "MBs": 11.6
+    },
+    {
+      "hwKiB": 1024,
+      "frameKiB": 256,
+      "MBs": 10.9
+    }
+  ],
+  "rawDataChannel": {
+    "note": "same Chromium, no SwiftDrop code: blast 200 MB of frames",
+    "1pc x 1ch (16/64/256 KiB frames, 1-8 MiB buffer)": "14-17 MB/s",
+    "1pc x 2ch": 14,
+    "1pc x 4ch": 16,
+    "2pc x 1ch": 15,
+    "4pc x 1ch": 15
+  },
+  "conclusion": "Engine reaches ~85% of the raw headless-Chromium DataChannel ceiling on this Windows machine; more channels or connections do not raise it. Stay on one channel. Real phone numbers must come from devices."
+}

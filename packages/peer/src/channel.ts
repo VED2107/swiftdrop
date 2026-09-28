@@ -58,6 +58,7 @@ const CONTROL = 1;
 const DATA = 2;
 const DATA_HEADER = 9;
 const DEFAULT_MAX_MESSAGE = 64 * 1024;
+const MAX_MESSAGE = 256 * 1024;
 const MIN_MESSAGE = 16 * 1024;
 
 export class DataChannelTransport implements PhoneTransport {
@@ -79,7 +80,7 @@ export class DataChannelTransport implements PhoneTransport {
     private readonly ch: ChannelLike,
     opts: FramingOptions = {},
   ) {
-    const max = Math.max(MIN_MESSAGE, Math.min(DEFAULT_MAX_MESSAGE, opts.maxMessageSize || DEFAULT_MAX_MESSAGE));
+    const max = Math.max(MIN_MESSAGE, Math.min(MAX_MESSAGE, opts.maxMessageSize || DEFAULT_MAX_MESSAGE));
     this.chunkBytes = max - DATA_HEADER;
     this.high = opts.highWaterMark ?? 1 << 20;
     ch.binaryType = "arraybuffer";

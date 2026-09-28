@@ -103,7 +103,11 @@ export const JoinRequestSchema = z.object({
   token: z.string().max(128).optional(),
   code: z.string().max(16).optional(),
   deviceName: z.string().min(1).max(64),
+  /** Random id this browser keeps; pairing again from it replaces its old entry instead of adding one. */
+  installId: z.string().regex(/^[A-Za-z0-9_-]{16,64}$/).optional(),
 });
+
+export const RenameDeviceSchema = z.object({ name: z.string().trim().min(1).max(40) });
 
 export const ApproveJoinSchema = z.object({ approve: z.boolean() });
 
@@ -160,7 +164,7 @@ export interface ProgressEvent {
 
 export type ServerEvent =
   | { t: "hello"; role: "host" | "guest"; deviceId: string | null }
-  | { t: "join-request"; requestId: string; deviceName: string; via: "qr" | "code" }
+  | { t: "join-request"; requestId: string; deviceName: string; via: "qr" | "code"; returning?: boolean }
   | { t: "join-resolved"; requestId: string }
   | { t: "devices"; devices: DeviceInfo[] }
   | { t: "offers"; offers: Offer[] }
@@ -208,6 +212,7 @@ export const ERROR_CODES = [
   "PAIRING_EXPIRED",
   "PAIRING_DENIED",
   "DECLINED",
+  "NAME_TAKEN",
   "RATE_LIMITED",
   "NOT_FOUND",
   "BAD_REQUEST",
@@ -230,6 +235,7 @@ export const USER_MESSAGES: Record<ErrorCode, string> = {
   PAIRING_EXPIRED: "That code expired. Ask for a fresh one on the PC.",
   PAIRING_DENIED: "The PC declined the connection.",
   DECLINED: "The other phone declined the files.",
+  NAME_TAKEN: "Another device already uses that name. Pick a different one.",
   RATE_LIMITED: "Too many attempts. Wait a minute and try again.",
   NOT_FOUND: "That transfer no longer exists on the PC.",
   BAD_REQUEST: "Something about that request didn't look right. Try again.",
@@ -276,6 +282,7 @@ function defaultStatus(code: ErrorCode): number {
     case "BAD_FRAME":
       return 422;
     case "INCOMPLETE":
+    case "NAME_TAKEN":
       return 409;
     case "DISK_FULL":
     case "DISK_WRITE":

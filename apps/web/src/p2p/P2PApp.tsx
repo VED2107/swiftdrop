@@ -26,6 +26,13 @@ type Stage =
   | { k: "transfer" }
   | { k: "lost" };
 
+/** Benchmark knobs (`?hw=<KiB>&frame=<KiB>`): send-buffer high-water mark and frame size. */
+const knobs = new URLSearchParams(location.search);
+const framing = {
+  ...(knobs.get("hw") ? { highWaterMark: Number(knobs.get("hw")) * 1024, lowWaterMark: (Number(knobs.get("hw")) * 1024) / 4 } : {}),
+  ...(knobs.get("frame") ? { maxMessageSize: Number(knobs.get("frame")) * 1024 } : {}),
+};
+
 const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("swiftdrop-p2p");
 const initialOffer = /[#&]o=([DP][A-Za-z0-9_-]+)/.exec(location.hash)?.[1] ?? null;
 const initialAnswer = /[#&]a=([DP][A-Za-z0-9_-]+)/.exec(location.hash)?.[1] ?? null;
@@ -97,7 +104,7 @@ export function P2PApp() {
     setError(null);
     try {
       session.current?.close();
-      const { session: s, offer } = await PeerSession.offer({ name });
+      const { session: s, offer } = await PeerSession.offer({ name, framing });
       session.current = s;
       setStage({ k: "send-offer", link: `${location.origin}${location.pathname}#o=${offer}` });
     } catch (e) {
@@ -135,7 +142,7 @@ export function P2PApp() {
       setError(null);
       try {
         session.current?.close();
-        const { session: s, answer } = await PeerSession.answer(text, { name });
+        const { session: s, answer } = await PeerSession.answer(text, { name, framing });
         session.current = s;
         setPeerName(s.remoteName);
         setStage({ k: "recv-answer", link: `${location.origin}${location.pathname}#a=${answer}` });

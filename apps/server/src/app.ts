@@ -15,6 +15,7 @@ import {
   CreateTransferSchema,
   HEADERS,
   JoinRequestSchema,
+  RenameDeviceSchema,
   MAX_BLOCKS_PER_CHUNK,
   OfferLocalSchema,
   PickLocalSchema,
@@ -127,7 +128,7 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
       if (who.role === "host") {
         send({ t: "devices", devices: auth.listDevices() });
         send({ t: "settings", destination: config.destination });
-        for (const j of auth.pendingJoins()) send({ t: "join-request", requestId: j.id, deviceName: j.deviceName, via: j.via });
+        for (const j of auth.pendingJoins()) send({ t: "join-request", requestId: j.id, deviceName: j.deviceName, via: j.via, returning: j.returning });
       }
     },
     (deviceId, delta) => {
@@ -207,7 +208,7 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
   route("POST", "/api/join", "public", async ({ req, res, ip }) => {
     const body = JoinRequestSchema.parse(await readJson(req, 4096));
     const join = auth.requestJoin(body, ip);
-    hub.toHosts({ t: "join-request", requestId: join.id, deviceName: join.deviceName, via: join.via });
+    hub.toHosts({ t: "join-request", requestId: join.id, deviceName: join.deviceName, via: join.via, returning: join.returning });
     json(res, 202, { requestId: join.id });
   });
 
@@ -225,6 +226,22 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
   });
 
   route("GET", "/api/host/devices", "host", ({ res }) => json(res, 200, { devices: auth.listDevices() }));
+
+  route("PATCH", "/api/host/devices/:id", "host", async ({ req, res, params }) => {
+    const { name } = RenameDeviceSchema.parse(await readJson(req, 1024));
+    const device = auth.rename(params[0]!, name);
+    broadcastDevices();
+    json(res, 200, device);
+  });
+
+  /** A phone renames itself. */
+  route("PATCH", "/api/device", "authed", async ({ req, res, deviceId }) => {
+    if (!deviceId) throw new ProtocolError("FORBIDDEN");
+    const { name } = RenameDeviceSchema.parse(await readJson(req, 1024));
+    const device = auth.rename(deviceId, name);
+    broadcastDevices();
+    json(res, 200, device);
+  });
 
   route("DELETE", "/api/host/devices/:id", "host", ({ res, params }) => {
     auth.forget(params[0]!);

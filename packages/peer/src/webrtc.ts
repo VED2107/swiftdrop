@@ -71,7 +71,10 @@ export class PeerSession {
   /** Resolves with the data-plane transport once the DataChannel is open. */
   async transport(): Promise<DataChannelTransport> {
     const ch = await this.channelReady;
-    const t = new DataChannelTransport(ch, { maxMessageSize: this.pc.sctp?.maxMessageSize, ...this.opts.framing });
+    // Never exceed what the other end accepts; 64 KiB unless a benchmark knob says otherwise.
+    const peerMax = this.pc.sctp?.maxMessageSize || Infinity;
+    const wanted = this.opts.framing?.maxMessageSize ?? 64 * 1024;
+    const t = new DataChannelTransport(ch, { ...this.opts.framing, maxMessageSize: Math.min(peerMax, wanted) });
     await t.connect();
     return t;
   }

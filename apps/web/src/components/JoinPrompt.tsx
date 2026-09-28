@@ -15,7 +15,7 @@ export function JoinPrompt() {
         <div id="join-prompt-title" style={{ fontWeight: 520 }}>
           {req.deviceName} wants to connect
         </div>
-        <div className="t-small">Only allow a device you're holding.</div>
+        <div className="t-small">{req.returning ? "Paired before. Allowing it replaces its old entry." : "Only allow a device you're holding."}</div>
       </div>
       <div className="flex gap-1">
         <button className="btn btn-ghost btn-sm" onClick={() => void Api.approve(req.requestId, false).catch(() => undefined)}>

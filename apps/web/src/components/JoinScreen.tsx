@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Api, ApiError, setToken } from "../lib/api.ts";
-import { deviceLabel, deviceName, isMobile } from "../lib/env.ts";
+import { deviceLabel, deviceName, installId, isMobile } from "../lib/env.ts";
 import { Swap } from "../ui/Swap.tsx";
 import { Connection } from "./Connection.tsx";
 
@@ -18,7 +18,7 @@ export function JoinScreen({ pairToken, reason, onPaired }: { pairToken: string 
   async function request(body: { token?: string; code?: string }) {
     setPhase({ kind: "requesting" });
     try {
-      const { requestId } = await Api.join({ ...body, deviceName: deviceName() });
+      const { requestId } = await Api.join({ ...body, deviceName: deviceName(), installId: installId() });
       setPhase({ kind: "waiting", requestId });
     } catch (e) {
       setPhase({ kind: "error", text: e instanceof ApiError ? e.message : "Couldn't reach your PC." });

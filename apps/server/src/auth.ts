@@ -25,6 +25,10 @@ export interface Pairing {
 interface JoinRequest {
   id: string;
   deviceName: string;
+  /** sha256 of the browser's install id, when it sent one */
+  installHash?: string;
+  /** a device from this browser is already paired: approving replaces it */
+  returning: boolean;
   via: "qr" | "code";
   ip: string;
   createdAt: number;
@@ -36,6 +40,8 @@ interface JoinRequest {
 interface Device {
   id: string;
   name: string;
+  /** sha256 of the browser's install id: one entry per browser, however often it pairs */
+  installHash?: string;
   tokenHash: string;
   pairedAt: number;
   lastSeen: number;
@@ -71,7 +77,7 @@ export class Auth {
     return this.pairing;
   }
 
-  requestJoin(input: { token?: string | undefined; code?: string | undefined; deviceName: string }, ip: string): JoinRequest {
+  requestJoin(input: { token?: string | undefined; code?: string | undefined; deviceName: string; installId?: string | undefined }, ip: string): JoinRequest {
     this.limiter.hit(`join:${ip}`, 20, 60_000);
     const p = this.pairing;
     const now = Date.now();
@@ -98,9 +104,14 @@ export class Auth {
     if (existing) return existing;
     const pendingFromIp = [...this.joins.values()].filter((j) => j.ip === ip && j.status === "pending").length;
     if (pendingFromIp >= 3) throw new ProtocolError("RATE_LIMITED");
+    const installHash = input.installId ? sha256(`install:${input.installId}`) : undefined;
+    const previous = installHash ? this.byInstall(installHash) : undefined;
     const join: JoinRequest = {
       id: randomToken(12),
-      deviceName: name,
+      // A returning browser keeps the name it had (including one the user chose).
+      deviceName: previous?.name ?? name,
+      ...(installHash ? { installHash } : {}),
+      returning: Boolean(previous),
       via,
       ip,
       createdAt: now,
@@ -118,7 +129,24 @@ export class Auth {
       return join;
     }
     const token = randomToken(32);
-    const device: Device = { id: `dv_${randomToken(9)}`, name: join.deviceName, tokenHash: sha256(token), pairedAt: Date.now(), lastSeen: Date.now() };
+    const previous = join.installHash ? this.byInstall(join.installHash) : undefined;
+    let device: Device;
+    if (previous) {
+      // Same browser pairing again (cleared token, new QR scan): one entry, fresh token, old one revoked.
+      this.byTokenHash.delete(previous.tokenHash);
+      previous.tokenHash = sha256(token);
+      previous.lastSeen = Date.now();
+      device = previous;
+    } else {
+      device = {
+        id: `dv_${randomToken(9)}`,
+        name: this.uniqueName(join.deviceName),
+        ...(join.installHash ? { installHash: join.installHash } : {}),
+        tokenHash: sha256(token),
+        pairedAt: Date.now(),
+        lastSeen: Date.now(),
+      };
+    }
     this.devices.set(device.id, device);
     this.byTokenHash.set(device.tokenHash, device);
     join.status = "approved";
@@ -163,6 +191,18 @@ export class Auth {
     return device;
   }
 
+  /** Names are unique across paired devices (case-insensitive). */
+  rename(deviceId: string, raw: string): DeviceInfo {
+    const d = this.devices.get(deviceId);
+    if (!d) throw new ProtocolError("NOT_FOUND");
+    const name = cleanName(raw);
+    if (!name) throw new ProtocolError("BAD_REQUEST", "empty name");
+    if (this.nameTaken(name, d.id)) throw new ProtocolError("NAME_TAKEN");
+    d.name = name;
+    this.saveDevices();
+    return this.info(d);
+  }
+
   forget(deviceId: string): void {
     const d = this.devices.get(deviceId);
     if (!d) return;
@@ -180,7 +220,31 @@ export class Auth {
   listDevices(): DeviceInfo[] {
     return [...this.devices.values()]
       .sort((a, b) => b.pairedAt - a.pairedAt)
-      .map((d) => ({ id: d.id, name: d.name, online: this.online.has(d.id), pairedAt: d.pairedAt }));
+      .map((d) => this.info(d));
+  }
+
+  private info(d: Device): DeviceInfo {
+    return { id: d.id, name: d.name, online: this.online.has(d.id), pairedAt: d.pairedAt };
+  }
+
+  private byInstall(hash: string): Device | undefined {
+    for (const d of this.devices.values()) if (d.installHash === hash) return d;
+    return undefined;
+  }
+
+  private nameTaken(name: string, exceptId?: string): boolean {
+    const k = name.toLocaleLowerCase();
+    for (const d of this.devices.values()) if (d.id !== exceptId && d.name.toLocaleLowerCase() === k) return true;
+    return false;
+  }
+
+  /** "iPhone" is taken: "iPhone 2", "iPhone 3", and so on. */
+  private uniqueName(base: string): string {
+    if (!this.nameTaken(base)) return base;
+    for (let n = 2; ; n++) {
+      const candidate = `${base.slice(0, 36)} ${n}`;
+      if (!this.nameTaken(candidate)) return candidate;
+    }
   }
 
   /** Short-lived capability for plain-navigation downloads (Safari can't add headers). */
@@ -246,6 +310,14 @@ export class Auth {
   private ensureDir() {
     if (!existsSync(this.stateDir)) mkdirSync(this.stateDir, { recursive: true });
   }
+}
+
+function cleanName(s: string): string {
+  return s
+    .replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 40);
 }
 
 function sha256(s: string): string {

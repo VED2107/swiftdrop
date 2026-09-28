@@ -54,7 +54,7 @@ export function App() {
           .then((s) => app.set({ destination: s.destination, nativePick: s.nativePick }))
           .catch(() => undefined);
       } else if (info.role === "guest") {
-        app.set({ role: "guest", phase: "ready", folderName: info.folderName });
+        app.set({ role: "guest", phase: "ready", folderName: info.folderName, deviceId: info.deviceId });
       } else {
         app.set({ role: null, phase: "join" });
       }

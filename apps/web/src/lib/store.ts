@@ -8,6 +8,8 @@ export interface JoinRequestView {
   requestId: string;
   deviceName: string;
   via: "qr" | "code";
+  /** this phone was paired before; allowing it replaces its old entry */
+  returning?: boolean;
 }
 
 export interface PendingConflict {
@@ -17,6 +19,8 @@ export interface PendingConflict {
 
 export interface AppState {
   role: "host" | "guest" | null;
+  /** Guest only: this phone's device id on the PC. */
+  deviceId: string | null;
   phase: "boot" | "join" | "ready";
   conn: Conn;
   rtt: number | null;
@@ -55,6 +59,7 @@ function createStore<T extends object>(initial: T) {
 
 export const app = createStore<AppState>({
   role: null,
+  deviceId: null,
   phase: "boot",
   conn: "connecting",
   rtt: null,

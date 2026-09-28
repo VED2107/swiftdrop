@@ -82,9 +82,11 @@ export const Api = {
     if (rotate) q.set("rotate", "1");
     return api<Pairing>(`/api/host/pairing?${q}`);
   },
-  join: (body: { token?: string; code?: string; deviceName: string }) => api<{ requestId: string }>("/api/join", { method: "POST", json: body }),
+  join: (body: { token?: string; code?: string; deviceName: string; installId?: string }) => api<{ requestId: string }>("/api/join", { method: "POST", json: body }),
   pollJoin: (id: string) => api<{ status: "pending" | "approved" | "denied"; token?: string }>(`/api/join/${id}`),
   approve: (id: string, approve: boolean) => api(`/api/host/joins/${id}`, { method: "POST", json: { approve } }),
+  renameDevice: (id: string, name: string) => api<DeviceInfo>(`/api/host/devices/${id}`, { method: "PATCH", json: { name } }),
+  renameSelf: (name: string) => api<DeviceInfo>("/api/device", { method: "PATCH", json: { name } }),
   forgetDevice: (id: string) => api(`/api/host/devices/${id}`, { method: "DELETE" }),
   devices: () => api<{ devices: DeviceInfo[] }>("/api/host/devices"),
   settings: () => api<HostSettings>("/api/host/settings"),

@@ -12,11 +12,11 @@ Vite + React + TypeScript + Tailwind (static SPA) served by a local Node.js serv
 
 ## Users
 
-General public. Anyone with an iPhone and a Windows PC on the same Wi-Fi (or an iPhone hotspot) who wants to move photos, videos, and files between them without cables, accounts, or cloud uploads. Often non-technical. Typical scene: a person at a desk, laptop open, phone in hand, wanting to dump hundreds or thousands of camera-roll items to the PC, or push a file from the PC to the phone.
+General public. Anyone with an iPhone or Android phone and a Windows PC on the same Wi-Fi (or an iPhone hotspot) who wants to move photos, videos, and files between them without cables, accounts, or cloud uploads. Often non-technical. Typical scene: a person at a desk, laptop open, phone in hand, wanting to dump hundreds or thousands of camera-roll items to the PC, or push a file from the PC to the phone.
 
 ## Product Purpose
 
-SwiftDrop moves files between an iPhone and a Windows PC over the local network as fast as the Wi-Fi allows. Success: transfers run close to the link's real bandwidth, survive Wi-Fi drops by resuming instead of restarting, and never pass through the internet.
+SwiftDrop moves files between a phone (iPhone or Android) and a Windows PC over the local network as fast as the Wi-Fi allows. Success: transfers run close to the link's real bandwidth, survive Wi-Fi drops by resuming instead of restarting, and never pass through the internet.
 
 ## Positioning
 

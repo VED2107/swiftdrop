@@ -3,8 +3,8 @@
 /* Contact sheet: film-base black, off-white print, edge-print grey, one grease-pencil red. */
 :root {
   --ground: #121212;
-  --film: #1c1c1d;
-  --film-2: #262628;
+  --film: #212123;
+  --film-2: #2b2b2e;
   --print: #ebe8e1;
   --print-2: #b9b6b0;
   --edge: #8d9199;
@@ -319,8 +319,8 @@ a {
 .rebate .edge {
   position: absolute;
   bottom: 3px;
-  font-size: 0.6875rem;
-  color: #a4a8af;
+  font-size: 0.8125rem;
+  color: #b3b6bc;
 }
 .edge-l {
   left: var(--gutter);
@@ -329,8 +329,12 @@ a {
   right: var(--gutter);
 }
 
+/* Clip sideways only: frame numbers print into the bottom rebate below. */
 .roll-window {
-  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  overflow-x: clip;
+  overflow-y: visible;
 }
 .roll-track {
   list-style: none;
@@ -359,10 +363,11 @@ a {
   object-fit: cover;
   filter: saturate(0.92) contrast(1.03);
 }
+/* Printed between the image and the perforations, like real edge numbers. */
 .frame-no {
   position: absolute;
   left: 2px;
-  bottom: calc(-1 * var(--rebate) + 7px);
+  top: calc(var(--frame-h) + 3px);
   font-size: 0.6875rem;
   color: #a4a8af;
 }
@@ -439,10 +444,10 @@ a {
 .prints {
   margin-top: clamp(36px, 5vw, 56px);
   display: grid;
-  grid-template-columns: 1.62fr 0.58fr;
+  grid-template-columns: 1.3fr 0.5fr 0.5fr;
   grid-template-areas:
-    "a b"
-    "c b";
+    "a b d"
+    "c b d";
   gap: clamp(20px, 2.6vw, 36px);
   align-items: start;
 }
@@ -460,8 +465,16 @@ a {
 }
 .print-c {
   grid-area: c;
-  width: 78%;
-  justify-self: end;
+}
+.print-b,
+.print-d {
+  align-self: center;
+}
+.print-d {
+  grid-area: d;
+}
+.print-d .tick {
+  width: 56px;
 }
 .print-img {
   position: relative;
@@ -494,19 +507,13 @@ a {
   font-size: 0.875rem;
   color: var(--red);
 }
-.sheet-note {
-  margin: clamp(28px, 4vw, 44px) 0 0;
-  max-width: 58ch;
-  font-size: clamp(1.1rem, 1rem + 0.3vw, 1.25rem);
-  color: var(--print);
-  text-wrap: pretty;
-}
 @media (max-width: 760px) {
   .prints {
     grid-template-columns: 1fr;
-    grid-template-areas: "a" "b" "c";
+    grid-template-areas: "a" "b" "c" "d";
   }
-  .print-b {
+  .print-b,
+  .print-d {
     width: 62%;
     justify-self: center;
   }
@@ -544,19 +551,20 @@ a {
 }
 .cut-piece {
   flex: none;
+  align-self: start;
   display: grid;
-  grid-template-rows: var(--rebate) auto var(--rebate);
+  grid-template-rows: var(--rebate) var(--frame-h) var(--rebate);
 }
 .cut-piece .frames {
   display: flex;
   gap: var(--frame-gap);
   padding-inline: var(--frame-gap);
 }
-.cut-piece .frame-no {
-  bottom: calc(-1 * var(--rebate) + 7px);
-}
+
 .cut-gap {
   flex: none;
+  align-self: start;
+  height: calc(var(--frame-h) + 2 * var(--rebate));
   width: 96px;
   display: flex;
   flex-direction: column;
@@ -571,6 +579,7 @@ a {
 }
 .cut-gap svg {
   flex: 1;
+  min-height: 0;
   width: 18px;
   margin: 6px 0;
   overflow: visible;
@@ -584,6 +593,37 @@ a {
 }
 .cut-strip.is-cut .cut-gap path {
   opacity: 1;
+}
+/* Phones: the two pieces stack with the cut between them, so the break is always in view. */
+@media (max-width: 700px) {
+  .cut-strip {
+    --frame-w: calc((100vw - 2 * var(--gutter) - 6 * var(--frame-gap)) / 5);
+    flex-direction: column;
+    align-items: flex-start;
+    overflow: visible;
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+  .cut-gap {
+    width: 100%;
+    height: 52px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 0 4px;
+  }
+  /* The break runs the full width, like a tear across the roll. */
+  .cut-gap svg {
+    display: none;
+  }
+  .cut-gap {
+    justify-content: space-between;
+    background: linear-gradient(90deg, var(--red) 0 55%, transparent 55%) center / 12px 3px repeat-x;
+  }
+  .cut-gap .edge {
+    background: var(--ground);
+    padding: 0 8px;
+  }
 }
 
 /* ---- privacy ----------------------------------------------------------------- */
@@ -741,5 +781,73 @@ a {
   }
   .btn {
     transition: none;
+  }
+}
+
+/* ---- phone to phone ------------------------------------------------------------ */
+
+.phones {
+  padding-block: clamp(56px, 9vh, 104px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: center;
+}
+.phones-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.handoff {
+  list-style: none;
+  margin: 0;
+  padding: 18px;
+  display: grid;
+  grid-template-columns: 1fr 72px 1fr;
+  align-items: end;
+  gap: 10px;
+  background: var(--film);
+  border-radius: 2px;
+}
+.handoff li {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.handoff-frame {
+  position: relative;
+  display: block;
+  aspect-ratio: 3 / 4;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--film-2);
+}
+.handoff-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.handoff-line {
+  align-self: center;
+}
+.handoff-line svg {
+  width: 100%;
+  height: 20px;
+  overflow: visible;
+}
+.handoff-line path {
+  fill: none;
+  stroke: var(--red);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 9 7;
+  filter: url(#grease);
+}
+.handoff .tick {
+  width: 38%;
+}
+@media (max-width: 760px) {
+  .phones {
+    grid-template-columns: 1fr;
   }
 }

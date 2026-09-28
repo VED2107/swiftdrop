@@ -1,5 +1,6 @@
 import "./site.css";
 import downloadIcon from "@phosphor-icons/core/assets/bold/download-simple-bold.svg?raw";
+import phonesIcon from "@phosphor-icons/core/assets/bold/device-mobile-bold.svg?raw";
 
 const DOWNLOAD_URL: string = import.meta.env.VITE_DOWNLOAD_URL || "https://github.com/VED2107/swiftdrop/releases/latest";
 const reduced = matchMedia("(prefers-reduced-motion: reduce)");
@@ -7,12 +8,22 @@ const TICK = `<svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path p
 const PHOTOS = Array.from({ length: 14 }, (_, i) => `/frames/f${String(i + 1).padStart(2, "0")}.webp`);
 
 for (const a of document.querySelectorAll<HTMLAnchorElement>("[data-download]")) a.href = DOWNLOAD_URL;
-for (const el of document.querySelectorAll<HTMLElement>('[data-icon="download"]')) el.innerHTML = downloadIcon;
-
-// On a phone the download isn't for this device: say so instead of offering a .exe.
+// On a phone the .exe isn't for this device: lead with phone to phone instead.
 if (/iPhone|iPad|Android/.test(navigator.userAgent)) {
   for (const n of document.querySelectorAll("[data-platform-note]")) n.textContent = "Download it on your Windows PC, then scan its code with this phone.";
+  const primary = document.querySelector<HTMLAnchorElement>("[data-hero-primary]");
+  const secondary = document.querySelector<HTMLAnchorElement>("[data-hero-secondary]");
+  if (primary && secondary) {
+    primary.removeAttribute("data-download");
+    primary.href = "/p2p/";
+    primary.querySelector("[data-label]")!.textContent = "Send phone to phone";
+    primary.querySelector(".icon")!.setAttribute("data-icon", "phones");
+    secondary.textContent = "Using a PC?";
+  }
 }
+
+const ICONS: Record<string, string> = { download: downloadIcon, phones: phonesIcon };
+for (const el of document.querySelectorAll<HTMLElement>("[data-icon]")) el.innerHTML = ICONS[el.dataset.icon!] ?? "";
 
 function frame(src: string, no: number, eager = false): HTMLLIElement {
   const li = document.createElement("li");
@@ -163,6 +174,9 @@ if (cut) {
 
 // ---------------------------------------------------------------------------
 // Privacy: the one word that matters gets underlined.
+
+const handoff = document.querySelector(".handoff .tick");
+if (handoff) onView(handoff, () => handoff.classList.add("is-drawn"), true, 0.8);
 
 const marked = document.querySelector(".marked");
 if (marked) onView(marked, () => marked.classList.add("is-drawn"), true, 0.8);

@@ -33,6 +33,7 @@
       </a>
       <nav aria-label="Main">
         <a class="navlink" href="#how">How it works</a>
+        <a class="navlink" href="#phones">Phone to phone</a>
         <a class="navlink" href="#privacy">Privacy</a>
         <a class="navlink" href="#faq">Questions</a>
         <a class="btn btn-sm" data-download href="#">Download</a>
@@ -45,11 +46,11 @@
           <h1 id="hero-title" class="display">Your camera roll, straight to your&nbsp;PC.</h1>
           <p class="lead">Photos, videos and files move between phone and PC over your own Wi-Fi. No cloud, no cable, no account.</p>
           <div class="actions">
-            <a class="btn btn-primary" data-download href="#">
+            <a class="btn btn-primary" data-download data-hero-primary href="#">
               <span class="icon" data-icon="download"></span>
-              Download for Windows
+              <span data-label>Download for Windows</span>
             </a>
-            <a class="btn btn-quiet" href="#how">How it works</a>
+            <a class="btn btn-quiet" data-hero-secondary href="#how">How it works</a>
           </div>
         </div>
 
@@ -69,7 +70,7 @@
         <h2 id="how-title" class="h2">Scan once. Then send anything, either&nbsp;way.</h2>
         <div class="prints">
           <figure class="print print-a">
-            <div class="print-img"><img src="/shots/pc-pair.webp" width="1600" height="1025" loading="lazy" alt="SwiftDrop on a Windows PC showing a QR code and a six-character pairing code" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
+            <div class="print-img"><img src="/shots/pc-pair.webp" width="1600" height="625" loading="lazy" alt="SwiftDrop on a Windows PC showing a QR code and a six-character pairing code" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
             <figcaption><span class="edge num">1</span>Open SwiftDrop on your PC. It shows a code to scan.</figcaption>
           </figure>
           <figure class="print print-b">
@@ -77,11 +78,14 @@
             <figcaption><span class="edge num">2</span>Point your phone's camera at it, then tap Allow on the PC.</figcaption>
           </figure>
           <figure class="print print-c">
-            <div class="print-img"><img src="/shots/pc-received.webp" width="1600" height="1025" loading="lazy" alt="The PC confirming four files received and the folder they were saved to" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
+            <div class="print-img"><img src="/shots/pc-received.webp" width="1600" height="610" loading="lazy" alt="The PC confirming four files received and the folder they were saved to" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
             <figcaption><span class="edge num">3</span>Pick photos on the phone. They land in a folder you choose on the PC.</figcaption>
           </figure>
+          <figure class="print print-d">
+            <div class="print-img"><img src="/shots/phone-offer.webp" width="1170" height="2532" loading="lazy" alt="The phone showing files from the PC, ready to download" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
+            <figcaption><span class="edge num">4</span>The other way: choose files on the PC. They're ready to download on the phone, straight from where they sit.</figcaption>
+          </figure>
         </div>
-        <p class="sheet-note">The other way works too: choose files on the PC and download them on the phone, straight from where they sit. Nothing is copied first.</p>
       </section>
 
       <section class="resume wrap" aria-labelledby="resume-title">
@@ -94,6 +98,22 @@
           <div class="cut-gap"><span class="edge">Wi-Fi lost</span><svg viewBox="0 0 24 200" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M12 4 C4 40 20 70 11 100 C3 130 20 160 12 196" /></svg><span class="edge">Back</span></div>
           <div class="strip cut-piece" data-piece="b"></div>
         </div>
+      </section>
+
+      <section class="phones wrap" id="phones" aria-labelledby="phones-title">
+        <div class="phones-copy">
+          <h2 id="phones-title" class="h2">No PC nearby? Send phone to&nbsp;phone.</h2>
+          <p class="body">Open this on both phones. Tap Send on one and Receive on the other, then each scans the other's code once. Files go straight between the two phones over your Wi-Fi or hotspot, never through a server.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="/p2p/"><span class="icon" data-icon="phones"></span>Open phone to phone</a>
+          </div>
+          <p class="small">Preview. Runs in Safari or Chrome with nothing to install. Keep both screens on while it sends.</p>
+        </div>
+        <ol class="handoff" aria-hidden="true">
+          <li><span class="edge">Phone A</span><span class="handoff-frame"><img src="/frames/f07.webp" width="640" height="480" alt="" loading="lazy" /></span></li>
+          <li class="handoff-line"><svg viewBox="0 0 200 24" preserveAspectRatio="none"><path d="M4 13 C50 6 110 19 196 11" /></svg></li>
+          <li><span class="edge">Phone B</span><span class="handoff-frame"><img src="/frames/f07.webp" width="640" height="480" alt="" loading="lazy" /><svg class="tick" viewBox="0 0 100 100"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></span></li>
+        </ol>
       </section>
 
       <section class="privacy wrap" id="privacy" aria-labelledby="privacy-title">
@@ -116,6 +136,7 @@
         <div class="faq-list">
           <details><summary>Do I need to install anything on my phone?</summary><p>No. SwiftDrop opens in Safari or Chrome on your phone after you scan the code. Only the PC runs the app.</p></details>
           <details><summary>Does it work with Android?</summary><p>Yes. iPhone and Android both work: scan with the camera (or Google Lens), or type the six-character code shown on the PC.</p></details>
+          <details><summary>Can two phones send to each other without a PC?</summary><p>Yes, as a preview. Open <a href="/p2p/">phone to phone</a> on both, and each scans the other's code once. Files go directly between the phones; the codes only carry connection details.</p></details>
           <details><summary>Do I need internet?</summary><p>No. Both devices only need to be on the same Wi-Fi. With no Wi-Fi around, turn on your phone's hotspot and connect the PC to it.</p></details>
           <details><summary>Windows asked about the firewall. Is that normal?</summary><p>Yes. Allow SwiftDrop on private networks so your phone can reach your PC. If you install for all users, the installer sets this up for you.</p></details>
           <details><summary>Can I rename my phone, or pair it again?</summary><p>Yes. Rename it on the PC in Settings, or from the phone itself. Pairing the same phone again keeps one entry instead of adding a second.</p></details>

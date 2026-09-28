@@ -5,7 +5,7 @@
  */
 import { chromium } from "@playwright/test";
 import { spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -62,6 +62,18 @@ try {
   await host.waitForTimeout(600);
   await host.evaluate(scrub);
   await host.screenshot({ path: `${out}/pc-received.png` });
+
+  // PC -> phone: offer a local folder in place, then the phone's "From your PC" row.
+  const give = join(dir, "For the phone");
+  mkdirSync(give, { recursive: true });
+  writeFileSync(join(give, "Boarding pass.pdf"), Buffer.alloc(180_000, 7));
+  writeFileSync(join(give, "Trip playlist.m4a"), Buffer.alloc(3 << 20, 8));
+  await host.request.post("http://localhost:8833/api/host/offers/paths", { data: { paths: [give] } });
+  await phone.getByText("From your PC").waitFor();
+  await phone.getByText("From your PC").scrollIntoViewIfNeeded();
+  await phone.evaluate(() => window.scrollBy(0, -260));
+  await phone.waitForTimeout(700);
+  await phone.screenshot({ path: `${out}/phone-offer.png` });
 } finally {
   await browser.close();
   server.kill();

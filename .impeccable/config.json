@@ -17,6 +17,15 @@
         ],
         "createdAt": "2026-09-28T19:57:20.940Z",
         "reason": "Claude: detector scanned index.html without the Vite-imported site.css (all roles read 16px); built CSS sets h1 clamp(2.5-5.6rem), h2 clamp(1.9-3.1rem), body 1.0625rem"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "apps/web/src/p2p/p2p.css"
+        ],
+        "createdAt": "2026-09-29T18:09:09.071Z",
+        "reason": "Claude decided: L271-292 are QR viewfinder corner brackets (.vf-tl/tr/bl/br), each an L of two 3px borders with a rounded corner framing the scan target, not a one-sided card accent"
       }
     ]
   }

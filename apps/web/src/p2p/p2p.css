@@ -1,0 +1,400 @@
+/*
+ * Phone to phone: the SwiftDrop app on a phone. Everything here composes the app's own
+ * tokens and components (styles.css); only layout and the few p2p-only objects live here.
+ * One addition: --mark, the website's grease-pencil red, used only for "verified".
+ */
+@layer components {
+  :root {
+    --mark: oklch(0.62 0.2 27);
+    --mark-a12: oklch(0.62 0.2 27 / 0.12);
+    --mark-a28: oklch(0.62 0.2 27 / 0.28);
+  }
+
+  .p2p {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  .p2p-main {
+    flex: 1;
+    width: 100%;
+    max-width: 480px;
+    margin-inline: auto;
+    padding: var(--s-4) var(--gutter) calc(132px + var(--safe-b));
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+  }
+  .p2p-title {
+    font-size: clamp(2.5rem, 1.9rem + 2.6vw, 3.25rem);
+  }
+  .p2p-status {
+    max-width: 62vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color var(--d-ui) ease;
+  }
+
+  /* the dock: the screen's actions, within thumb reach, never wider than the column */
+  .p2p-dock {
+    left: 50%;
+    right: auto;
+    width: min(100%, 480px);
+    translate: -50% 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .p2p-dock-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-2);
+  }
+  .p2p-dock .btn-lg {
+    --btn-h: 58px;
+  }
+
+  .p2p-alert {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    margin: 0;
+    padding: var(--s-3) var(--s-3) var(--s-3) var(--s-4);
+    border-radius: var(--r-m);
+    background: var(--danger-a12);
+    box-shadow: inset 0 0 0 1px oklch(0.72 0.13 28 / 0.25);
+    color: var(--text);
+    font-size: var(--t-small);
+    animation: swap-in var(--d-ui) var(--ease-out) both;
+  }
+
+  /* home: how it works, as the app's numbered steps */
+  .p2p-how {
+    list-style: none;
+    margin: 0;
+    padding: var(--s-5) 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    border-top: 1px solid var(--hairline);
+  }
+  .p2p-how li {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: var(--s-3);
+    align-items: start;
+  }
+  .p2p-how li > span:last-child {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  /* choose */
+  .p2p-choice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s-6);
+    min-height: 112px;
+    padding: var(--s-4);
+    border: 0;
+    border-radius: var(--r-l);
+    background: var(--surface);
+    box-shadow: var(--sh-hair);
+    color: var(--text-2);
+    text-align: left;
+    font-weight: 520;
+    cursor: pointer;
+    transition:
+      transform var(--d-micro) var(--ease-out),
+      background-color var(--d-micro) ease;
+  }
+  .p2p-choice > span {
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+  .p2p-choice:active {
+    transform: scale(0.97);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .p2p-choice:hover {
+      background: var(--surface-2);
+    }
+  }
+  .p2p-grid {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .p2p-grid > li {
+    animation: cell-in 380ms var(--ease-out) both;
+  }
+  .p2p-tile-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 8px;
+    color: var(--text-3);
+    background: var(--surface);
+  }
+  .p2p-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 26px;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: oklch(0.13 0.004 260 / 0.72);
+    color: var(--text);
+    cursor: pointer;
+  }
+  /* a bigger invisible hit area than the visible dot */
+  .p2p-remove::before {
+    content: "";
+    position: absolute;
+    inset: -8px;
+  }
+  .p2p-more {
+    display: grid;
+    place-items: center;
+    font-size: var(--t-small);
+    color: var(--text-2);
+    box-shadow: var(--sh-hair);
+  }
+
+  /* pairing */
+  .p2p-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--s-2);
+  }
+  .p2p-steps li {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    font-size: var(--t-micro);
+    color: var(--text-3);
+    white-space: nowrap;
+  }
+  .p2p-steps li::before {
+    content: "";
+    height: 3px;
+    border-radius: 3px;
+    background: oklch(1 0 0 / 0.08);
+    transition: background-color var(--d-ui) ease;
+  }
+  .p2p-steps li > span {
+    display: none;
+  }
+  .p2p-steps li[data-state="done"]::before {
+    background: var(--text-3);
+  }
+  .p2p-steps li[data-state="current"] {
+    color: var(--text);
+  }
+  .p2p-steps li[data-state="current"]::before {
+    background: var(--accent);
+  }
+
+  .p2p-qr {
+    width: min(100%, 340px);
+    padding: 20px;
+    animation: qr-in var(--d-state) var(--ease-spring) both;
+  }
+  @keyframes qr-in {
+    from {
+      opacity: 0;
+      transform: scale(0.94);
+    }
+  }
+
+  .p2p-viewfinder {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: var(--r-xl);
+    overflow: hidden;
+    background: var(--bg-sink);
+    box-shadow: inset 0 0 0 1px var(--hairline);
+  }
+  .p2p-viewfinder video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity var(--d-state) var(--ease-out);
+  }
+  .p2p-viewfinder[data-live="true"] video {
+    opacity: 1;
+  }
+  .p2p-viewfinder-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-3);
+    padding: var(--s-8);
+    text-align: center;
+    color: var(--text-3);
+  }
+  /* corner brackets frame the target; accent only once the camera is live */
+  .vf-c {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    border: 0 solid oklch(1 0 0 / 0.5);
+    transition: border-color var(--d-ui) ease;
+  }
+  .p2p-viewfinder[data-live="true"] .vf-c {
+    border-color: var(--accent);
+  }
+  .vf-tl {
+    top: 18%;
+    left: 18%;
+    border-top-width: 3px;
+    border-left-width: 3px;
+    border-top-left-radius: 12px;
+  }
+  .vf-tr {
+    top: 18%;
+    right: 18%;
+    border-top-width: 3px;
+    border-right-width: 3px;
+    border-top-right-radius: 12px;
+  }
+  .vf-bl {
+    bottom: 18%;
+    left: 18%;
+    border-bottom-width: 3px;
+    border-left-width: 3px;
+    border-bottom-left-radius: 12px;
+  }
+  .vf-br {
+    bottom: 18%;
+    right: 18%;
+    border-bottom-width: 3px;
+    border-right-width: 3px;
+    border-bottom-right-radius: 12px;
+  }
+  .p2p-manual {
+    display: flex;
+    gap: var(--s-2);
+  }
+  .p2p-manual .field {
+    height: 48px;
+    font-size: 16px; /* no iOS zoom on focus */
+  }
+  .p2p-manual .btn {
+    --btn-h: 48px;
+  }
+
+  /* incoming + received files */
+  .p2p-figure {
+    margin: 0;
+    font-size: clamp(2rem, 1.6rem + 2vw, 2.75rem);
+    font-weight: 500;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+  }
+  .p2p-list {
+    list-style: none;
+    margin: 0;
+    padding: var(--s-1) var(--s-4);
+    max-height: 264px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .p2p-list li {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s-3);
+    min-height: 52px;
+    font-size: var(--t-small);
+    border-bottom: 1px solid var(--hairline);
+  }
+  .p2p-list li:last-child {
+    border-bottom: 0;
+  }
+  .p2p-glyph {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--r-s);
+    background: var(--surface-2);
+    color: var(--text-3);
+  }
+
+  /* verified: the website's red tick, drawn once, as an app check */
+  .p2p-mark {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--mark-a12);
+    box-shadow: inset 0 0 0 1px var(--mark-a28);
+    animation: swap-in var(--d-state) var(--ease-spring) both;
+  }
+  .p2p-mark path,
+  .p2p-verified path {
+    fill: none;
+    stroke: var(--mark);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .p2p-mark path {
+    stroke-width: 10;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: draw 520ms var(--ease-out) 180ms forwards;
+  }
+  .p2p-verified {
+    color: var(--text);
+  }
+  .p2p-verified path {
+    stroke-width: 13;
+  }
+
+  .p2p-spin {
+    animation: p2p-spin 0.9s linear infinite;
+  }
+  @keyframes p2p-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .p2p-qr,
+    .p2p-grid > li,
+    .p2p-alert,
+    .p2p-mark {
+      animation: fade-in 200ms ease both;
+    }
+    .p2p-mark path {
+      animation: none;
+      stroke-dashoffset: 0;
+    }
+    .p2p-spin {
+      animation-duration: 2.4s;
+    }
+  }
+}

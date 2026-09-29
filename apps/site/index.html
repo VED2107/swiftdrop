@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#121212" />
-    <title>SwiftDrop · Your camera roll, straight to your PC</title>
-    <meta name="description" content="Move photos, videos and files between your iPhone or Android and your Windows PC, directly over your own Wi-Fi. No cloud, no cable, no account, nothing to install on the phone." />
-    <meta property="og:title" content="SwiftDrop · Your camera roll, straight to your PC" />
-    <meta property="og:description" content="Phone and PC file transfer over your own Wi-Fi. No cloud, no cable, no account." />
+    <title>SwiftDrop · Files straight between your devices</title>
+    <meta name="description" content="Send photos, videos and files directly between your devices: phone to phone with no PC, or between your phone and a Windows PC over your own Wi-Fi. No cloud, no cable, no account." />
+    <meta property="og:title" content="SwiftDrop · Files straight between your devices" />
+    <meta property="og:description" content="Phone to phone with no PC, or phone and Windows PC over your own Wi-Fi. No cloud, no cable, no account." />
     <meta property="og:image" content="/icon-512.png" />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -32,42 +32,181 @@
         <span>SwiftDrop</span>
       </a>
       <nav aria-label="Main">
-        <a class="navlink" href="#how">How it works</a>
         <a class="navlink" href="#phones">Phone to phone</a>
-        <a class="navlink" href="#privacy">Privacy</a>
+        <a class="navlink" href="#pc">With a PC</a>
+        <a class="navlink" href="#checked">Checks</a>
         <a class="navlink" href="#faq">Questions</a>
-        <a class="btn btn-sm" data-download href="#">Download</a>
+        <a class="btn btn-sm btn-primary" href="/p2p/"><span class="icon" data-icon="phones"></span><span class="nav-cta-long">Open phone to phone</span><span class="nav-cta-short">Phone to phone</span></a>
       </nav>
     </header>
 
     <main id="main">
+      <!-- ============================================================ hero -->
       <section class="hero" id="top" aria-labelledby="hero-title">
         <div class="hero-copy wrap">
-          <h1 id="hero-title" class="display">Your camera roll, straight to your&nbsp;PC.</h1>
-          <p class="lead">Photos, videos and files move between phone and PC over your own Wi-Fi. No cloud, no cable, no account.</p>
-          <div class="actions">
-            <a class="btn btn-primary" data-download data-hero-primary href="#">
-              <span class="icon" data-icon="download"></span>
-              <span data-label>Download for Windows</span>
+          <h1 id="hero-title" class="display">Send files straight between your&nbsp;devices.</h1>
+          <p class="lead">Photos, videos and files go directly from one device to the other, over your own Wi-Fi. <strong>No PC required for phone to phone.</strong></p>
+          <div class="actions hero-actions">
+            <a class="btn btn-primary btn-lg" href="/p2p/">
+              <span class="icon" data-icon="phones"></span>
+              Send phone to phone
             </a>
-            <a class="btn btn-quiet" data-hero-secondary href="#how">How it works</a>
+            <a class="btn btn-quiet btn-lg" href="#pc">
+              <span class="icon" data-icon="desktop"></span>
+              Transfer with PC
+            </a>
           </div>
+          <p class="small">Free. No account. Nothing to install on a phone.</p>
         </div>
 
-        <figure class="roll" aria-label="Photos moving from a phone to a PC, each one checked off as it arrives">
+        <figure class="roll" aria-label="Photos selected on one device, sent, checked at the red line, and arriving on the other">
           <div class="roll-strip strip" data-roll>
-            <div class="rebate rebate-top" aria-hidden="true"><span class="edge edge-l">Phone</span><span class="edge edge-r">PC</span></div>
+            <div class="rebate rebate-top" aria-hidden="true">
+              <span class="edge station" style="--at: var(--gutter)">Select</span>
+              <span class="edge station station-send" style="--at: 34%">Send</span>
+              <span class="edge station station-arrive">Arrive</span>
+            </div>
             <div class="roll-window">
               <ol class="roll-track" data-track></ol>
             </div>
             <div class="rebate rebate-bottom" aria-hidden="true"></div>
-            <div class="gate" aria-hidden="true"><span class="edge">Checked on arrival</span></div>
+            <div class="gate" aria-hidden="true"><span class="edge">Verify</span></div>
           </div>
         </figure>
       </section>
 
-      <section class="sheet wrap" id="how" aria-labelledby="how-title">
-        <h2 id="how-title" class="h2">Scan once. Then send anything, either&nbsp;way.</h2>
+      <!-- ============================================================ capabilities -->
+      <section class="index wrap" id="what" aria-labelledby="what-title">
+        <div class="section-head">
+          <h2 id="what-title" class="h2">One app. Every&nbsp;direction.</h2>
+          <p class="body">Five things SwiftDrop does, each one on your own network.</p>
+        </div>
+        <div class="sheet-panel">
+          <div class="rebate rebate-top" aria-hidden="true"><span class="edge edge-code">SwiftDrop&nbsp;&nbsp;▸ 01&nbsp;&nbsp;▸ 02&nbsp;&nbsp;▸ 03&nbsp;&nbsp;▸ 04&nbsp;&nbsp;▸ 05</span></div>
+          <ol class="cells">
+            <li class="cell">
+              <div class="cell-img" aria-hidden="true">
+                <svg viewBox="0 0 120 72"><rect class="ink" x="18" y="12" width="26" height="48" rx="5" /><rect class="ink" x="76" y="12" width="26" height="48" rx="5" /><path class="red dash" d="M48 36 H72" /><path class="red" d="M67 31 L72 36 L67 41" /></svg>
+              </div>
+              <div class="cell-text">
+                <span class="edge num cell-no">01</span>
+                <h3 class="h4">Phone → Phone</h3>
+                <p>Direct, peer to peer. The two phones connect to each other, no PC and no server in between.</p>
+              </div>
+            </li>
+            <li class="cell">
+              <div class="cell-img" aria-hidden="true">
+                <svg viewBox="0 0 120 72"><rect class="ink" x="14" y="16" width="22" height="40" rx="4.5" /><rect class="ink" x="60" y="14" width="48" height="32" rx="3" /><path class="ink" d="M76 56 H92 M84 46 V56" /><path class="red dash" d="M40 36 H56" /><path class="red" d="M51 31 L56 36 L51 41" /></svg>
+              </div>
+              <div class="cell-text">
+                <span class="edge num cell-no">02</span>
+                <h3 class="h4">Phone → PC</h3>
+                <p>Straight into a folder you choose, over your local network.</p>
+              </div>
+            </li>
+            <li class="cell">
+              <div class="cell-img" aria-hidden="true">
+                <svg viewBox="0 0 120 72"><rect class="ink" x="12" y="14" width="48" height="32" rx="3" /><path class="ink" d="M28 56 H44 M36 46 V56" /><rect class="ink" x="84" y="16" width="22" height="40" rx="4.5" /><path class="red dash" d="M64 36 H80" /><path class="red" d="M75 31 L80 36 L75 41" /></svg>
+              </div>
+              <div class="cell-text">
+                <span class="edge num cell-no">03</span>
+                <h3 class="h4">PC → Phone</h3>
+                <p>Send from the PC straight from where the files sit. No copying them anywhere first.</p>
+              </div>
+            </li>
+            <li class="cell">
+              <div class="cell-img" aria-hidden="true">
+                <svg viewBox="0 0 120 72"><rect class="ink" x="10" y="22" width="18" height="28" rx="2" /><rect class="ink" x="32" y="22" width="18" height="28" rx="2" /><path class="red dash" d="M60 14 C54 28 66 44 58 58" /><rect class="ink" x="70" y="22" width="18" height="28" rx="2" /><rect class="ink" x="92" y="22" width="18" height="28" rx="2" /></svg>
+              </div>
+              <div class="cell-text">
+                <span class="edge num cell-no">04</span>
+                <h3 class="h4">Resume</h3>
+                <p>If the connection drops, it carries on from what already arrived instead of starting over.</p>
+              </div>
+            </li>
+            <li class="cell">
+              <div class="cell-img" aria-hidden="true">
+                <svg viewBox="0 0 120 72"><rect class="ink" x="34" y="10" width="52" height="52" rx="2" /><path class="red tick-path" pathLength="1" d="M46 38 L56 48 L76 24" /></svg>
+              </div>
+              <div class="cell-text">
+                <span class="edge num cell-no">05</span>
+                <h3 class="h4">Verify</h3>
+                <p>Whatever a phone sends is checked block by block before it counts as done.</p>
+              </div>
+            </li>
+          </ol>
+          <div class="rebate rebate-bottom" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <!-- ============================================================ phone to phone -->
+      <section class="p2p" id="phones" aria-labelledby="phones-title">
+        <div class="wrap p2p-head">
+          <div class="p2p-copy">
+            <h2 id="phones-title" class="h2 h2-xl">Phone to phone. Straight across.</h2>
+            <p class="body">Open SwiftDrop in the browser on both phones. Each scans the other's code once, then photos, videos and files go directly between them over Wi-Fi or a hotspot. The codes carry connection details, never your files.</p>
+            <div class="actions">
+              <a class="btn btn-primary btn-lg" href="/p2p/"><span class="icon" data-icon="phones"></span>Open phone to phone</a>
+            </div>
+            <p class="small">Runs in Safari or Chrome. Keep both screens on while it sends.</p>
+          </div>
+          <p class="stamp" aria-label="No PC required"><span>No PC</span><span>required</span><svg viewBox="0 0 200 110" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M8 12 C60 6 140 9 192 8 C195 40 193 72 191 100 C130 104 70 102 9 101 C6 70 7 40 8 12 Z" /></svg></p>
+        </div>
+
+        <div class="wrap duo" role="img" aria-label="iPhone A shows a pairing code; iPhone B receives the files directly over WebRTC and shows them verified">
+          <figure class="device device-a">
+            <span class="edge">iPhone A · sends</span>
+            <div class="handset"><img src="/shots/p2p-code.webp" width="780" height="1688" loading="lazy" alt="" /></div>
+          </figure>
+          <div class="duo-link" aria-hidden="true">
+            <span class="edge">Direct · WebRTC</span>
+            <svg viewBox="0 0 200 24" preserveAspectRatio="none"><path class="duo-path" pathLength="1" d="M4 13 C50 6 110 19 188 11" /><path class="duo-head" d="M180 4 L192 11 L181 19" /></svg>
+            <span class="edge">No server in between</span>
+          </div>
+          <figure class="device device-b">
+            <span class="edge">iPhone B · receives</span>
+            <div class="handset"><img src="/shots/p2p-verified.webp" width="780" height="1688" loading="lazy" alt="" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
+          </figure>
+        </div>
+
+        <div class="seq-wrap">
+          <ol class="seq" aria-label="Phone to phone, step by step">
+            <li class="seq-frame">
+              <div class="seq-img"><img src="/shots/p2p-home.webp" width="780" height="1688" loading="lazy" alt="The SwiftDrop phone to phone screen with Send and Receive buttons" /></div>
+              <p><span class="edge num">1</span><b>Open</b> Tap Send on one phone, Receive on the other.</p>
+            </li>
+            <li class="seq-frame">
+              <div class="seq-img"><img src="/shots/p2p-code.webp" width="780" height="1688" loading="lazy" alt="The sending phone showing a QR code for the other phone to scan" /></div>
+              <p><span class="edge num">2</span><b>Pair</b> Each phone scans the other's code once.</p>
+            </li>
+            <li class="seq-frame">
+              <div class="seq-img"><img src="/shots/p2p-incoming.webp" width="780" height="1688" loading="lazy" alt="The receiving phone asking to accept seven incoming files" /></div>
+              <p><span class="edge num">3</span><b>Accept</b> The receiver sees what's coming and says yes.</p>
+            </li>
+            <li class="seq-frame">
+              <div class="seq-img"><img src="/shots/p2p-receiving.webp" width="780" height="1688" loading="lazy" alt="The receiving phone at 38 percent, connected directly on the local network" /></div>
+              <p><span class="edge num">4</span><b>Transfer</b> Straight from one phone to the other.</p>
+            </li>
+            <li class="seq-frame">
+              <div class="seq-img"><img src="/shots/p2p-verified.webp" width="780" height="1688" loading="lazy" alt="Transfer complete, seven files, verified with every block checked" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
+              <p><span class="edge num">5</span><b>Verified</b> Every block checked, then saved to Photos or Files.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- ============================================================ with a PC -->
+      <section class="sheet wrap" id="pc" aria-labelledby="pc-title">
+        <div class="pc-head">
+          <div class="section-head">
+            <h2 id="pc-title" class="h2">With a PC: scan once, then send either&nbsp;way.</h2>
+            <p class="body">SwiftDrop for Windows receives straight to a folder on disk and sends files back without staging them first. Phones connect from the browser; only the PC installs anything.</p>
+          </div>
+          <div class="pc-download">
+            <a class="btn btn-primary btn-lg" data-download href="#"><span class="icon" data-icon="download"></span>Download for Windows</a>
+            <p class="small" data-platform-note>Free for Windows 10 and 11. Installs for your user, no admin needed.</p>
+          </div>
+        </div>
         <div class="prints">
           <figure class="print print-a">
             <div class="print-img"><img src="/shots/pc-pair.webp" width="1600" height="625" loading="lazy" alt="SwiftDrop on a Windows PC showing a QR code and a six-character pairing code" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
@@ -79,76 +218,62 @@
           </figure>
           <figure class="print print-c">
             <div class="print-img"><img src="/shots/pc-received.webp" width="1600" height="610" loading="lazy" alt="The PC confirming four files received and the folder they were saved to" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
-            <figcaption><span class="edge num">3</span>Pick photos on the phone. They land in a folder you choose on the PC.</figcaption>
+            <figcaption><span class="edge num">3</span>Phone to PC: pick photos on the phone. They land in a folder you choose.</figcaption>
           </figure>
           <figure class="print print-d">
             <div class="print-img"><img src="/shots/phone-offer.webp" width="1170" height="2532" loading="lazy" alt="The phone showing files from the PC, ready to download" /><svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></div>
-            <figcaption><span class="edge num">4</span>The other way: choose files on the PC. They're ready to download on the phone, straight from where they sit.</figcaption>
+            <figcaption><span class="edge num">4</span>PC to phone: choose files on the PC. The phone downloads them straight from where they sit.</figcaption>
           </figure>
         </div>
       </section>
 
-      <section class="resume wrap" aria-labelledby="resume-title">
+      <!-- ============================================================ resume -->
+      <section class="resume wrap" id="resume" aria-labelledby="resume-title">
         <div class="resume-copy">
-          <h2 id="resume-title" class="h2">Wi-Fi dropped? It carries&nbsp;on.</h2>
-          <p class="body">Every piece is checked when it lands. After a drop, SwiftDrop sends only what's missing, never the whole thing again.</p>
+          <h2 id="resume-title" class="h2">Connection dropped? It carries&nbsp;on.</h2>
+          <p class="body">After a drop, SwiftDrop sends only what's missing, never the whole thing again. With a PC it picks up by itself when the phone is back; between two phones, pair them once more and it continues from where it stopped.</p>
         </div>
         <div class="cut-strip" data-cut role="img" aria-label="A strip of nine frames: frames one to four arrived, the connection dropped, then frames five to nine followed">
           <div class="strip cut-piece" data-piece="a"></div>
-          <div class="cut-gap"><span class="edge">Wi-Fi lost</span><svg viewBox="0 0 24 200" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M12 4 C4 40 20 70 11 100 C3 130 20 160 12 196" /></svg><span class="edge">Back</span></div>
+          <div class="cut-gap"><span class="edge">Connection lost</span><svg viewBox="0 0 24 200" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M12 4 C4 40 20 70 11 100 C3 130 20 160 12 196" /></svg><span class="edge">Back</span></div>
           <div class="strip cut-piece" data-piece="b"></div>
         </div>
       </section>
 
-      <section class="phones wrap" id="phones" aria-labelledby="phones-title">
-        <div class="phones-copy">
-          <h2 id="phones-title" class="h2">No PC nearby? Send phone to&nbsp;phone.</h2>
-          <p class="body">Open this on both phones. Tap Send on one and Receive on the other, then each scans the other's code once. Files go straight between the two phones over your Wi-Fi or hotspot, never through a server.</p>
-          <div class="actions">
-            <a class="btn btn-primary" href="/p2p/"><span class="icon" data-icon="phones"></span>Open phone to phone</a>
-          </div>
-          <p class="small">Preview. Runs in Safari or Chrome with nothing to install. Keep both screens on while it sends.</p>
-        </div>
-        <ol class="handoff" aria-hidden="true">
-          <li><span class="edge">Phone A</span><span class="handoff-frame"><img src="/frames/f07.webp" width="640" height="480" alt="" loading="lazy" /></span></li>
-          <li class="handoff-line"><svg viewBox="0 0 200 24" preserveAspectRatio="none"><path d="M4 13 C50 6 110 19 196 11" /></svg></li>
-          <li><span class="edge">Phone B</span><span class="handoff-frame"><img src="/frames/f07.webp" width="640" height="480" alt="" loading="lazy" /><svg class="tick" viewBox="0 0 100 100"><path pathLength="1" d="M16 56 L40 80 L86 20" /></svg></span></li>
-        </ol>
-      </section>
-
-      <section class="privacy wrap" id="privacy" aria-labelledby="privacy-title">
-        <h2 id="privacy-title" class="statement">Your files <span class="marked">never<svg viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 15 C60 6 130 20 190 11 C230 5 270 14 296 9" /></svg></span> touch a&nbsp;server.</h2>
-        <p class="body">There is no SwiftDrop cloud. Files go from one device to the other over your own network, and it works with no internet at all. A new phone can only connect after you tap Allow on your PC.</p>
-      </section>
-
-      <section class="facts wrap" aria-labelledby="facts-title">
-        <h2 id="facts-title" class="h3">The details</h2>
-        <dl>
+      <!-- ============================================================ verify + privacy -->
+      <section class="privacy wrap" id="checked" aria-labelledby="privacy-title">
+        <h2 id="privacy-title" class="statement">Checked on arrival. <span class="marked">Never<svg viewBox="0 0 300 24" preserveAspectRatio="none" aria-hidden="true"><path pathLength="1" d="M4 15 C60 6 130 20 190 11 C230 5 270 14 296 9" /></svg></span> on a&nbsp;server.</h2>
+        <p class="body">When a phone sends, each block is hashed on the way out and checked on arrival; a file only counts once its checksum matches, and a bad block is simply sent again. There is no SwiftDrop cloud: files go from one device to the other over your own network, even with no internet at all.</p>
+        <dl class="facts">
+          <div><dt class="edge">Checks</dt><dd>Every block a phone sends</dd></div>
+          <div><dt class="edge">Data path</dt><dd>Your network only</dd></div>
+          <div><dt class="edge">Pairing</dt><dd>A code scan, approved once</dd></div>
           <div><dt class="edge">Account</dt><dd>None</dd></div>
-          <div><dt class="edge">Pairing</dt><dd>You approve each phone, once</dd></div>
-          <div><dt class="edge">Checks</dt><dd>Every 1 MiB block, on both ends</dd></div>
-          <div><dt class="edge">Install</dt><dd>For your user, no admin needed</dd></div>
         </dl>
       </section>
 
+      <!-- ============================================================ faq -->
       <section class="faq wrap" id="faq" aria-labelledby="faq-title">
         <h2 id="faq-title" class="h2">Questions</h2>
         <div class="faq-list">
-          <details><summary>Do I need to install anything on my phone?</summary><p>No. SwiftDrop opens in Safari or Chrome on your phone after you scan the code. Only the PC runs the app.</p></details>
-          <details><summary>Does it work with Android?</summary><p>Yes. iPhone and Android both work: scan with the camera (or Google Lens), or type the six-character code shown on the PC.</p></details>
-          <details><summary>Can two phones send to each other without a PC?</summary><p>Yes, as a preview. Open <a href="/p2p/">phone to phone</a> on both, and each scans the other's code once. Files go directly between the phones; the codes only carry connection details.</p></details>
-          <details><summary>Do I need internet?</summary><p>No. Both devices only need to be on the same Wi-Fi. With no Wi-Fi around, turn on your phone's hotspot and connect the PC to it.</p></details>
+          <details><summary>Do I need a PC to send between two phones?</summary><p>No. Open <a href="/p2p/">phone to phone</a> on both phones and each scans the other's code once. The files go directly between the phones; nothing passes through a PC or a server.</p></details>
+          <details><summary>Do I need to install anything on my phone?</summary><p>No. SwiftDrop runs in Safari or Chrome on your phone. Only the Windows PC runs an app, and only if you use one.</p></details>
+          <details><summary>Does it work with Android?</summary><p>Yes. iPhone and Android both work, with each other and with the PC: scan with the camera (or Google Lens), or type the six-character code the PC shows.</p></details>
+          <details><summary>Do I need internet?</summary><p>No. Both devices only need to be on the same Wi-Fi. With no Wi-Fi around, turn on one phone's hotspot and connect the other device to it.</p></details>
+          <details><summary>Where do files end up on the receiving phone?</summary><p>They're kept safely in the browser until you tap Save, which hands them to Photos or Files through the share sheet.</p></details>
           <details><summary>Windows asked about the firewall. Is that normal?</summary><p>Yes. Allow SwiftDrop on private networks so your phone can reach your PC. If you install for all users, the installer sets this up for you.</p></details>
-          <details><summary>Can I rename my phone, or pair it again?</summary><p>Yes. Rename it on the PC in Settings, or from the phone itself. Pairing the same phone again keeps one entry instead of adding a second.</p></details>
-          <details><summary>Are there size limits?</summary><p>Not in practice. Big videos go straight to disk on the PC. Keep SwiftDrop on screen on your phone while it sends, since phones pause web pages in the background.</p></details>
+          <details><summary>Are there size limits?</summary><p>Not in practice with a PC: big videos go straight to disk. Between phones, the receiving phone needs the free space. Either way, keep SwiftDrop on screen while it sends, since phones pause web pages in the background.</p></details>
           <details><summary>Will my iPhone photos stay HEIC?</summary><p>The photo picker may convert them to JPEG. For originals, tap Options, then Current, in the picker, or send them from the Files app.</p></details>
         </div>
       </section>
 
+      <!-- ============================================================ close -->
       <section class="close wrap" aria-labelledby="close-title">
-        <h2 id="close-title" class="display display-close">Your photos, your network.</h2>
-        <a class="btn btn-primary" data-download href="#"><span class="icon" data-icon="download"></span>Download for Windows</a>
-        <p class="small" data-platform-note>Free for Windows 10 and 11. Nothing to install on the phone.</p>
+        <h2 id="close-title" class="display display-close">Your files, your&nbsp;network.</h2>
+        <div class="actions hero-actions">
+          <a class="btn btn-primary btn-lg" href="/p2p/"><span class="icon" data-icon="phones"></span>Send phone to phone</a>
+          <a class="btn btn-quiet btn-lg" data-download href="#"><span class="icon" data-icon="download"></span>Download for Windows</a>
+        </div>
       </section>
     </main>
 

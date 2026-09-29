@@ -1,6 +1,9 @@
 import "./site.css";
 import downloadIcon from "@phosphor-icons/core/assets/bold/download-simple-bold.svg?raw";
 import phonesIcon from "@phosphor-icons/core/assets/bold/device-mobile-bold.svg?raw";
+import desktopIcon from "@phosphor-icons/core/assets/bold/desktop-bold.svg?raw";
+
+document.documentElement.classList.add("js");
 
 const DOWNLOAD_URL: string = import.meta.env.VITE_DOWNLOAD_URL || "https://github.com/VED2107/swiftdrop/releases/latest";
 const reduced = matchMedia("(prefers-reduced-motion: reduce)");
@@ -8,21 +11,12 @@ const TICK = `<svg class="tick" viewBox="0 0 100 100" aria-hidden="true"><path p
 const PHOTOS = Array.from({ length: 14 }, (_, i) => `/frames/f${String(i + 1).padStart(2, "0")}.webp`);
 
 for (const a of document.querySelectorAll<HTMLAnchorElement>("[data-download]")) a.href = DOWNLOAD_URL;
-// On a phone the .exe isn't for this device: lead with phone to phone instead.
+// On a phone the .exe isn't for this device: say where it goes instead. Phone to phone already leads.
 if (/iPhone|iPad|Android/.test(navigator.userAgent)) {
   for (const n of document.querySelectorAll("[data-platform-note]")) n.textContent = "Download it on your Windows PC, then scan its code with this phone.";
-  const primary = document.querySelector<HTMLAnchorElement>("[data-hero-primary]");
-  const secondary = document.querySelector<HTMLAnchorElement>("[data-hero-secondary]");
-  if (primary && secondary) {
-    primary.removeAttribute("data-download");
-    primary.href = "/p2p/";
-    primary.querySelector("[data-label]")!.textContent = "Send phone to phone";
-    primary.querySelector(".icon")!.setAttribute("data-icon", "phones");
-    secondary.textContent = "Using a PC?";
-  }
 }
 
-const ICONS: Record<string, string> = { download: downloadIcon, phones: phonesIcon };
+const ICONS: Record<string, string> = { download: downloadIcon, phones: phonesIcon, desktop: desktopIcon };
 for (const el of document.querySelectorAll<HTMLElement>("[data-icon]")) el.innerHTML = ICONS[el.dataset.icon!] ?? "";
 
 function frame(src: string, no: number, eager = false): HTMLLIElement {
@@ -173,10 +167,18 @@ if (cut) {
 }
 
 // ---------------------------------------------------------------------------
-// Privacy: the one word that matters gets underlined.
+// Marks that draw once as they come into view: the verify cell, the phone-to-phone stamp,
+// the direct line between the two phones, their ticks, and the one word that matters.
 
-const handoff = document.querySelector(".handoff .tick");
-if (handoff) onView(handoff, () => handoff.classList.add("is-drawn"), true, 0.8);
+/** Add `cls` to `el` when it scrolls into view (immediately under reduced motion). */
+function drawOnView(el: Element | null, cls = "is-drawn", threshold = 0.6, delay = 0) {
+  if (!el) return;
+  if (reduced.matches) return el.classList.add(cls);
+  onView(el, () => setTimeout(() => el.classList.add(cls), delay), true, threshold);
+}
 
-const marked = document.querySelector(".marked");
-if (marked) onView(marked, () => marked.classList.add("is-drawn"), true, 0.8);
+drawOnView(document.querySelector(".cells"), "is-drawn", 0.4, 300);
+drawOnView(document.querySelector(".stamp"), "is-drawn", 0.8);
+drawOnView(document.querySelector(".duo"), "is-drawn", 0.45);
+drawOnView(document.querySelector(".seq"), "is-drawn", 0.35);
+drawOnView(document.querySelector(".marked"), "is-drawn", 0.8);

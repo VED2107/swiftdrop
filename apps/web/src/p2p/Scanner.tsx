@@ -1,4 +1,5 @@
 import jsQR from "jsqr";
+import { CameraOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 /**
@@ -10,13 +11,18 @@ import { useEffect, useRef, useState } from "react";
 export function Scanner({ onResult, hint }: { onResult: (text: string) => void; hint: string }) {
   const video = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [live, setLive] = useState(false);
   const [manual, setManual] = useState("");
   const done = useRef(false);
+  // The page repaints on a clock; a fresh callback each render must not restart the camera.
+  const result = useRef(onResult);
+  result.current = onResult;
 
   useEffect(() => {
     let stream: MediaStream | null = null;
     let raf = 0;
     let last = 0;
+    let stopped = false;
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     const tick = (t: number) => {
@@ -32,52 +38,58 @@ export function Scanner({ onResult, hint }: { onResult: (text: string) => void; 
       const code = jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" });
       if (code?.data) {
         done.current = true;
-        onResult(code.data);
+        result.current(code.data);
+        // A code that turns out wrong leaves this scanner up: look again after a beat.
+        setTimeout(() => (done.current = false), 2000);
       }
     };
     (async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+        if (stopped) return stream.getTracks().forEach((t) => t.stop());
         if (video.current) {
           video.current.srcObject = stream;
           await video.current.play().catch(() => undefined);
+          setLive(true);
         }
         raf = requestAnimationFrame(tick);
       } catch {
-        setError(isSecureContext ? "Camera unavailable. Allow camera access, or paste the code below." : "The camera needs a secure (https) page. Paste the code below instead.");
+        setError(isSecureContext ? "Camera unavailable. Allow camera access in your browser settings, or paste the code below." : "The camera needs a secure (https) page. Paste the code below instead.");
       }
     })();
     return () => {
+      stopped = true;
       cancelAnimationFrame(raf);
       stream?.getTracks().forEach((t) => t.stop());
     };
-  }, [onResult]);
+  }, []);
 
   return (
-    <div className="flex flex-col gap-4">
-      {!error && (
-        <div className="relative w-full overflow-hidden" style={{ aspectRatio: "1", borderRadius: 28, background: "var(--surface-2)" }}>
-          <video ref={video} playsInline muted className="absolute inset-0 w-full h-full object-cover" />
-          <div className="absolute inset-[18%] pointer-events-none" style={{ border: "2px solid rgba(255,255,255,0.85)", borderRadius: 20 }} />
-        </div>
-      )}
-      <p className="t-small">{error ?? hint}</p>
+    <div className="flex flex-col gap-5">
+      <div className="p2p-viewfinder" data-live={live}>
+        {error ? (
+          <div className="p2p-viewfinder-empty">
+            <CameraOff size={24} strokeWidth={1.5} />
+            <p className="t-small">{error}</p>
+          </div>
+        ) : (
+          <video ref={video} playsInline muted aria-label="Camera view for scanning the code" />
+        )}
+        <span className="vf-c vf-tl" aria-hidden />
+        <span className="vf-c vf-tr" aria-hidden />
+        <span className="vf-c vf-bl" aria-hidden />
+        <span className="vf-c vf-br" aria-hidden />
+      </div>
+      {!error && <p className="t-small text-center">{hint}</p>}
       <form
-        className="flex gap-2"
+        className="p2p-manual"
         onSubmit={(e) => {
           e.preventDefault();
           if (manual.trim()) onResult(manual.trim());
         }}
       >
-        <input
-          aria-label="Paste code"
-          className="flex-1 min-w-0 mono"
-          style={{ background: "var(--surface-2)", border: "1px solid var(--hairline-2)", borderRadius: 12, padding: "10px 12px", color: "var(--text)" }}
-          placeholder="…or paste the code"
-          value={manual}
-          onChange={(e) => setManual(e.target.value)}
-        />
-        <button className="btn btn-secondary btn-sm" type="submit">
+        <input aria-label="Paste code" className="field mono flex-1 min-w-0" placeholder="Can't scan? Paste the code" autoComplete="off" autoCapitalize="off" spellCheck={false} value={manual} onChange={(e) => setManual(e.target.value)} />
+        <button className="btn btn-secondary" type="submit" disabled={!manual.trim()}>
           Use code
         </button>
       </form>

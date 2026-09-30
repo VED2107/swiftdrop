@@ -76,6 +76,10 @@ Double-click to run: it opens the browser, stores settings in `%USERPROFILE%\.sw
 
 Environment: `SWIFTDROP_PORT` (8787), `SWIFTDROP_DEST`, `SWIFTDROP_MAX_FILE_BYTES`, `SWIFTDROP_LOG` (`debug|info|warn|error`), `SWIFTDROP_NO_OPEN=1`. `SWIFTDROP_E2E=1` is a **test-only** mode (a second browser on the PC acts as the phone) — never use it on a real network.
 
+## Native app (in progress)
+
+A Flutter app for iOS, Android, Windows, macOS and Linux is being built alongside this one in `apps/swiftdrop` (design system and shell so far), with a pure-Dart core in `packages/swiftdrop_core`. The web app and Windows server stay the shipping product until the native app reaches parity. Plan and status: `docs/FLUTTER_MIGRATION.md`; commands: `apps/swiftdrop/README.md`.
+
 ## Architecture
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full decision record. Short version:

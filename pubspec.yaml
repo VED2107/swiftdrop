@@ -1,0 +1,9 @@
+# Dart pub workspace for the native SwiftDrop app. The TypeScript packages are a separate
+# pnpm workspace (pnpm-workspace.yaml); pnpm ignores these folders (no package.json).
+name: swiftdrop_workspace
+publish_to: none
+environment:
+  sdk: ^3.13.0
+workspace:
+  - apps/swiftdrop
+  - packages/swiftdrop_core

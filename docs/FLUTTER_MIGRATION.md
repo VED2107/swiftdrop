@@ -1,6 +1,6 @@
 # Flutter migration: architecture assessment
 
-Status: **Phase 1 (analysis) only. Nothing is implemented yet.** This document is the plan the later phases follow. Every claim about the current code comes from reading it at `712638e`; every claim about a platform that this Windows machine cannot test is marked **verify on device**.
+Status: **Phase 2 (foundations) complete.** Phase 1 analysis below; what Phase 2 built and every dependency/version decision it made are in §14. No transfer functionality has been ported yet. This document is the plan the later phases follow. Every claim about the current code comes from reading it at `712638e`; every claim about a platform that this Windows machine cannot test is marked **verify on device**.
 
 Baseline at the time of writing: `pnpm test` 66/66 passing (7 files), Flutter 3.29.3 / Dart 3.7.2 installed, Windows + Android toolchains present, **no macOS host** (iOS and macOS builds cannot be produced or signed from this machine).
 
@@ -407,10 +407,96 @@ disk ─► bounded read-ahead (RandomAccessFile, 1–16 MiB) ─► xxh64 per 1
 
 ---
 
-## 13. Decisions needed before Phase 2
+## 13. Decisions made before Phase 2
 
-1. **Core language**: pure Dart (recommended) vs Rust via FFI.
-2. **Flutter version**: upgrade to current stable at Phase 2 (recommended) or stay on 3.29.3.
-3. **Repo layout**: `apps/swiftdrop` + `packages/swiftdrop_core` + `packages/swiftdrop_platform` inside this monorepo (recommended) vs a separate repo.
-4. **State management**: Riverpod (recommended: testable providers, no codegen required) vs Bloc.
-5. **Apple hardware**: when a Mac and developer account are available for Phase 6.
+All six recommendations accepted (2026-09-30):
+
+1. **Core language**: pure Dart, protocol-compatible with the TS code, shared vectors; Rust only if profiling later shows a bottleneck Dart can't handle.
+2. **Flutter version**: upgraded (§14.1).
+3. **Repo layout**: this monorepo, `apps/swiftdrop` + `packages/swiftdrop_core` (+ `packages/swiftdrop_platform` when native code starts). Web app and Node server stay until parity.
+4. **State management**: Riverpod, application state only; engine and business logic stay independent of it.
+5. **Accent**: red in the native app, one token (`SdColors.red`); the web app keeps its lime accent.
+6. **Font**: each platform's system font, tabular figures for every live number; Geist not bundled.
+
+Still open: **Apple hardware** (Mac + developer account) for Phase 6.
+
+---
+
+## 14. Phase 2 record: foundations
+
+Scope was foundations only: toolchain, repo structure, package boundaries, Riverpod wiring, design tokens, Liquid Glass primitives, platform interfaces and the app shell. **No transfer, transport or discovery code was ported** (that is Phase 3+). The TypeScript apps are untouched and still pass.
+
+### 14.1 Toolchain and dependency decisions
+
+| Decision | Choice | Why / notes |
+|---|---|---|
+| Flutter | **3.29.3 → 3.47.5** (stable, 2026-09-17), Dart **3.7.2 → 3.13.4** | Current stable at upgrade time. The SDK at `C:\dev\flutter\flutter` is shared machine-wide; to roll back: `git -C C:\dev\flutter\flutter checkout 3.29.3`, then `flutter --version`. No Flutter code existed in this repo, so nothing here needed migrating. |
+| Breaking change hit | `IconData` is now a `final` class | `phosphor_flutter` 2.1.0 (last release 2024-05, unmaintained) extends it and **fails to compile** on 3.47. It only surfaced in `flutter test`, because the analyzer doesn't analyze dependencies. |
+| Icons | **`flutter_tabler_icons` 1.43.0** | Font glyphs built as `const IconData` (compatible with the final class), full outline + filled set including every device type, one stroke weight; release builds subset the font. Rejected: `hugeicons` 1.2.0 (maintained, but renders SVG path data through `flutter_svg` per icon, heavier and not `IconData`); `lucide_icons_flutter` (discouraged by the design rules unless asked). All icon use goes through `SdIcons`, so a future swap touches one file. |
+| State management | **`flutter_riverpod` 3.4.3** | Providers only wire services to widgets and hold UI preferences. |
+| Routing | **`go_router` 18.0.2** | `StatefulShellRoute.indexedStack`: each section keeps its scroll state; flows push above the shell later. |
+| Repo structure | Dart **pub workspace** at the repo root (`pubspec.yaml`, one `pubspec.lock`) with `apps/swiftdrop` and `packages/swiftdrop_core` | pnpm ignores these folders (no `package.json`); `pnpm -r ls` still lists exactly the 8 TS packages. |
+| Bundle id | `app.swiftdrop.swiftdrop` (Android `applicationId`, iOS/macOS bundle id) | Placeholder from `flutter create`. **Change before Phase 10** if another id is wanted; it is expensive to change after a store release. |
+| Platforms scaffolded | Android, iOS, Windows, macOS, Linux | Web deliberately not enabled (§4: no sockets in a browser). |
+| Desktop window | min **720 × 540** logical, default 1200 × 800, title "SwiftDrop" | Windows `WM_GETMINMAXINFO` (DPI-scaled), GTK geometry hints, `NSWindow.contentMinSize`. Only the Windows runner was built here. |
+| Android toolchain | licenses **not accepted** | `flutter doctor --android-licenses` must be run by the owner (it's a licence agreement). Android builds are blocked until then. |
+| Apple platforms | not buildable here | No macOS host (unchanged from §12). |
+
+### 14.2 What exists now
+
+```
+pubspec.yaml                      Dart workspace root
+packages/swiftdrop_core/          pure Dart; no Flutter, no Riverpod (enforced by test/boundaries_test.dart)
+  lib/src/protocol/               constants, error codes + native-app messages, wire types (Manifest, FileEntry,
+                                  TransferStatus, …) in the TS JSON shapes; tests check them against
+                                  packages/protocol/src/index.ts until the Phase 3 vectors exist
+  lib/src/transport/              Link (TCP/WebRTC/memory byte link), ControlMessage, LinkPath;
+                                  EngineTransport (the engine's view of the network), CancelToken
+  lib/src/platform/               FileSource/ByteReader, FileSink/SinkFactory, StateStore;
+                                  Discovery, IdentityStore, BackgroundExecution, Notifications
+  lib/src/services/               app-facing models (Device, TransferSnapshot, IncomingOffer, TransferRecord)
+                                  and services (DeviceDirectory, TransferService, TransferHistory);
+                                  Idle* implementations that report the truth: nobody nearby, nothing moving
+  lib/src/format/                 formatBytes/Rate/Duration/Count (same output as packages/shared)
+  lib/testing.dart                scripted Demo* services (invented numbers; only behind SWIFTDROP_DEMO)
+apps/swiftdrop/lib/
+  design/                         tokens · theme · materials (LiquidGlass, AmbientBackground) · components ·
+                                  icons · motion   (see docs/FLUTTER_UI_PLAN.md)
+  app/                            providers (Riverpod), router (go_router), shell (adaptive navigation +
+                                  shortcuts), app (theme, appearance resolution, environment)
+  screens/                        Home, Transfers, Devices, Settings (Appearance + About), debug-only design gallery
+```
+
+Layering as agreed, each arrow a one-way import:
+
+```
+screens/ (widgets) → app/ (Riverpod) → swiftdrop_core services → [Phase 3+: engine → EngineTransport/Link → platform]
+design/ is imported by screens only; it reads SdAppearance (an InheritedWidget), never Riverpod.
+```
+
+### 14.3 Liquid Glass as built
+
+- Four levels (`GlassLevel.surface / card / floating / sheet`), one widget (`LiquidGlass`), specs in `SdMaterials`. Only `floating` and `sheet` create a `BackdropFilter` (blur + saturation), always via `BackdropFilter.grouped` under one app-level `BackdropGroup`.
+- On phones the action dock and tab bar are **one floating surface** (one blur), so a sheet on top makes two: the budget.
+- `GlassBudget` counts visible real blurs (tickers enabled, so offstage tabs don't count); a debug build reports an error above 2, which fails widget tests.
+- Glass setting: Full / Subtle (no blur, denser floating fill) / Off (solid). High contrast forces Off. iOS "Reduce Transparency" isn't exposed by Flutter's `MediaQuery`; the platform layer reports it in Phase 6.
+- Environment: one `CustomPainter`, three light fields drifting over 40–70 s, repainted at most 20×/s; brighter red field while a transfer runs; frozen under Reduce Motion.
+- Continuous-corner (superellipse) shapes everywhere via `RoundedSuperellipseBorder` / `ClipRSuperellipse`.
+
+### 14.4 Verification at the Phase 2 checkpoint
+
+| Check | Result |
+|---|---|
+| `dart analyze` + `dart test` (core) | clean · 12/12 |
+| `flutter analyze` + `flutter test` (app) | clean · 21/21 (shell on phone and desktop, keyboard shortcuts, blur budget incl. a sheet, glass modes, token discipline, contrast, tabular numbers, touch targets, screen-reader labels) |
+| `pnpm test` + `pnpm typecheck` (existing TS) | 66/66 · clean |
+| `flutter build windows --release` | builds; demo build inspected at 1200 × 800, phone layout rendered at 390 × 844 |
+
+Found and fixed during the checkpoint: a fixed-height device strip clipped cards at larger text sizes; the path badge overflowed narrow cards; the entrance fade hid new cards from screen readers for its first frames; disabled primary buttons rendered as faded red; cancelled transfers used the retry icon.
+
+### 14.5 Deferred on purpose
+
+- Settings persistence (appearance is in memory): lands with the settings store in Phase 4.
+- `packages/swiftdrop_platform` (federated plugin): created with the first native implementation (Phase 4/5); the interfaces it implements already exist in the core.
+- Tray, drag-and-drop, context menus: Phase 4 desktop pass.
+- Send / Receive / Connect-with-a-code buttons are present but disabled until their flows exist.

@@ -9,3 +9,5 @@ playwright-report
 .playwright-mcp
 release
 dist-p2p
+.dart_tool
+/build

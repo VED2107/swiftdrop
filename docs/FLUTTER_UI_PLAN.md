@@ -204,7 +204,7 @@ lib/design/
     status/      status_pill.dart · path_badge.dart ("Direct · Local network")
     pairing/     qr_code_glass_container.dart · qr_scanner_frame.dart · sas_code.dart
     feedback/    interruption_banner.dart · empty_state.dart · inline_error.dart
-  icons/         sd_icons.dart (one icon family, Phosphor, one stroke weight; device-type mapping)
+  icons/         sd_icons.dart (one icon family, Tabler, one stroke weight; device-type mapping)
   motion/        springs.dart · page_transitions.dart · reduce_motion.dart
 lib/screens/     home/ transfers/ devices/ settings/ send/ receive/ pair/ transfer/
 lib/app/         router (go_router) · shell · providers (Riverpod view models)

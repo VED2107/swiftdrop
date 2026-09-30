@@ -1,15 +1,46 @@
-import '../platform/files.dart';
 import 'models.dart';
 
 /// Application services: the only API the app layer (Riverpod) talks to. Behind them sit
 /// discovery, pairing, the engine and the transports; none of that leaks through here.
 
+/// Something picked to send. Plain data (it crosses into the engine isolate).
+class SendItem {
+  const SendItem.file(this.path) : folder = false;
+  const SendItem.folder(this.path) : folder = true;
+
+  /// Filesystem path (desktop; on mobile a path the platform layer resolved).
+  final String path;
+
+  /// A folder is sent with its structure (relative paths preserved).
+  final bool folder;
+}
+
+/// How other devices reach this one (shown on the Receive screen, encoded in the QR).
+class LocalEndpoint {
+  const LocalEndpoint({required this.deviceId, required this.name, required this.addresses, required this.port});
+  final String deviceId;
+  final String name;
+
+  /// Private LAN addresses, best first.
+  final List<String> addresses;
+  final int port;
+
+  /// What the other device types or scans: `192.168.1.20:47800`.
+  String? get primary => addresses.isEmpty ? null : '${addresses.first}:$port';
+}
+
 abstract interface class DeviceDirectory {
   /// Nearby, connected and remembered devices, re-emitted on every change.
   Stream<List<Device>> watch();
+
+  /// This device as others see it; null until the listener is up.
+  Stream<LocalEndpoint?> endpoint();
+
+  /// Connects to a device by address (`host:port`), remembers it, returns it.
+  Future<Device> connect(String address);
   Future<void> rename(String deviceId, String name);
 
-  /// Removes trust: the next connection needs pairing again.
+  /// Removes it from known devices (and trust, once pairing exists).
   Future<void> forget(String deviceId);
 }
 
@@ -21,12 +52,15 @@ abstract interface class TransferService {
   Stream<List<IncomingOffer>> incoming();
 
   /// Starts sending; returns the transfer id. The receiver still has to accept.
-  Future<String> send(String deviceId, List<FileSource> files);
+  Future<String> send(String deviceId, List<SendItem> items);
   Future<void> accept(String transferId);
   Future<void> decline(String transferId);
   Future<void> pause(String transferId);
   Future<void> resume(String transferId);
   Future<void> cancel(String transferId);
+
+  /// Drop a finished transfer from the live list (it stays in history).
+  Future<void> dismiss(String transferId);
 }
 
 abstract interface class TransferHistory {

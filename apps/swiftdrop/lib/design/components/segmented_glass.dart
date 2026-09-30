@@ -24,7 +24,7 @@ class SegmentedGlass<T> extends StatelessWidget {
       container: true,
       label: label,
       child: LiquidGlass(
-        level: GlassLevel.card,
+        level: GlassLevel.elevated,
         radius: SdRadius.row,
         padding: const EdgeInsets.all(3),
         child: Row(children: [

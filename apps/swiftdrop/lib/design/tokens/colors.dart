@@ -37,4 +37,12 @@ abstract final class SdColors {
 
   /// Shadows are tinted toward the ground, never pure black.
   static const shadow = Color(0xFF020203);
+
+  /// QR tile: the one place with near-pure white on near-black, because scanners need
+  /// maximum contrast (the code is never tinted, blurred or placed on glass).
+  static const qrPaper = Color(0xFFFAFAFA);
+  static const qrInk = Color(0xFF0E0E10);
+
+  /// Destructive / failure text and glyphs (with a word and an icon, never colour alone).
+  static const warning = Color(0xFFFFB38A);
 }

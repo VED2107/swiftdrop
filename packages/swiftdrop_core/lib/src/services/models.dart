@@ -11,6 +11,9 @@ enum DeviceStatus {
   connecting,
   connected,
 
+  /// Connected and in the middle of a transfer.
+  busy,
+
   /// Known (paired before) but not seen right now.
   offline,
 }
@@ -25,6 +28,7 @@ class Device {
     this.path,
     this.trusted = false,
     this.lastUsed,
+    this.address,
   });
 
   final String id;
@@ -40,7 +44,12 @@ class Device {
   final bool trusted;
   final DateTime? lastUsed;
 
-  Device copyWith({String? name, DeviceStatus? status, LinkPath? path, bool? trusted, DateTime? lastUsed}) => Device(
+  /// Last known `host:port`, for reconnecting. Technical: shown only in connection details.
+  final String? address;
+
+  bool get reachable => status != DeviceStatus.offline;
+
+  Device copyWith({String? name, DeviceStatus? status, LinkPath? path, bool? trusted, DateTime? lastUsed, String? address}) => Device(
         id: id,
         name: name ?? this.name,
         kind: kind,
@@ -49,6 +58,7 @@ class Device {
         path: path ?? this.path,
         trusted: trusted ?? this.trusted,
         lastUsed: lastUsed ?? this.lastUsed,
+        address: address ?? this.address,
       );
 }
 
@@ -91,6 +101,8 @@ class TransferSnapshot {
     this.path,
     this.error,
     required this.startedAt,
+    this.label = '',
+    this.location,
   });
 
   final String transferId;
@@ -113,6 +125,12 @@ class TransferSnapshot {
   final LinkPath? path;
   final ErrorCode? error;
   final DateTime startedAt;
+
+  /// A short description of what's moving ("24 photos", "Holiday").
+  final String label;
+
+  /// Receiving side: the folder the files land in.
+  final String? location;
 
   double get fraction => bytesTotal == 0 ? (phase == TransferPhase.complete ? 1 : 0) : bytesDone / bytesTotal;
   bool get verified => phase == TransferPhase.complete && filesVerified == filesTotal;

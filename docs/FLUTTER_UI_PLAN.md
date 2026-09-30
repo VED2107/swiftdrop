@@ -1,6 +1,6 @@
 # Flutter app UI plan: screens, components, material system
 
-Status: **plan only, for review before implementation.** Companion to `docs/FLUTTER_MIGRATION.md`. The UI is built in the Flutter app from Phase 4 onward; it never touches the protocol, transports, or engine, only view models exposed by the application layer.
+Status: Phase 2 built the foundation (tokens, glass primitives, shell). **Phase 3 turns it into the product UI**; §13 records the Phase 3 design decisions. Companion to `docs/FLUTTER_MIGRATION.md`. The UI is built in the Flutter app from Phase 4 onward; it never touches the protocol, transports, or engine, only view models exposed by the application layer.
 
 Surface mode: **Operate** (the visitor completes a task). The marketing site stays Persuade and keeps its own world (contact sheet, Archivo, grease-pencil red). The app shares the red and the near-black ground with it, nothing else.
 
@@ -282,3 +282,33 @@ Screens are wired to real engine view models as each platform phase lands; until
 1. **Accent colour.** The web app uses signal lime (`--accent`) for "live link" and red only for "verified"; the site and this brief use red. Plan: the app goes red-only, the web app is left as is until the browser guest UI is next touched. Confirm.
 2. **Light theme.** Brief specifies a dark environment. Plan: dark only at first, tokens structured so a light theme can be added. Confirm.
 3. **Font.** Plan uses each platform's system font with tabular numbers, per the brief, rather than Geist (web app) or Archivo (site). Confirm.
+
+---
+
+## 13. Phase 3 design decisions
+
+Reference: Apple's Liquid Glass overview (developer.apple.com/documentation/technologyoverviews/liquid-glass). The principles taken from it, not the look: glass is reserved for the **navigation and control layer** that floats above content; content itself stays solid and legible; the material takes colour and light from what's behind it; controls morph and respond instead of simply appearing; one clear hierarchy of layers.
+
+| Topic | Decision |
+|---|---|
+| Material names | The four levels become `GlassLevel.regular / elevated / floating / sheet` (was surface / card / floating / sheet). Regular and elevated never blur; floating and sheet blur for real. Budget of two real blurs stays, with the debug guard. |
+| Material response | Each level gets an *interaction response*: elevated surfaces brighten their rim and lift (shadow + 1 pt translate) on hover/press; floating glass picks up a tint from the environment state (red when a transfer is live). A **specular sheen** follows the pointer on desktop (a gradient in the edge painter, no extra layer). |
+| Environment states | `AmbientBackground` becomes state-driven: `idle` (calm), `searching` (slow breathing of the cool field), `connected` (soft glow where the devices are), `transferring` (a faint directional band along the transfer axis, speed tied to measured throughput, capped), `completed` (one short red bloom, then back to idle). Reduce Motion: static per state. |
+| Home | Title block ("SwiftDrop", "Send anything. Directly."), a spatial **nearby field** (devices as objects, not a list), and one dominant floating **Send** action (red, largest element). Receive stays one tap away (dock on phone, header on desktop). |
+| Transfer screen | Spatial view: sender and receiver glyphs on one axis, a connection line whose **file tokens** advance with *measured* bytes (position = bytes done / total; density = files in flight), central tabular readout (bytes, %, speed, remaining). No animation runs faster than the data. |
+| Device states | Searching · Available · Connecting · Connected · Busy · Offline, each with words + icon; connected devices carry the only red rim. |
+| Desktop | Workstation layout: sidebar · content canvas · right **transfer panel** (live transfer or selected device) at ≥ 1240 pt; drop files anywhere, or onto a device card to send to it; context menus on devices and history rows. |
+| Screens checked | 390×844, 430×932, 768×1024, 1200×800, 1440×900 via a screenshot tool (`tool/screens.dart`) rendering real fonts. |
+| Not faked | Pairing confirmation codes, "verified device" badges and scan success are shown in the design gallery only until Phase 7 wires real pairing. |
+
+---
+
+## 14. Phase 3 as built
+
+- Levels `regular / elevated / floating / sheet`; fills are a faint top-lit gradient; elevated and interactive surfaces lift 2 pt and brighten their rim on hover, with a pointer sheen on desktop. Real blur only on the floating panel (tabs + action dock on phones), the sidebar, the send dock and sheets; the debug guard (≤ 2) holds on every screen at all five sizes (widget test).
+- Environment: idle / searching (pairing screen) / connected / transferring (band paced by measured throughput) / one bloom per completed transfer; all derived from engine state in `environmentProvider`; static under Reduce Motion.
+- Transfer visual: the link fills with confirmed bytes and file tokens advance only with confirmed bytes; snapshots are eased by `SmoothValue`, which never runs ahead of the latest real value.
+- Menus stay solid (they'd otherwise be a third blur). The QR sits on an opaque tile inside elevated glass.
+- New type roles `micro` and `numericMedium`; new motion token `breath`. Screens and app code contain no raw colours, durations, font sizes, radii or icon-package imports (test-enforced).
+- Screenshot tool: `flutter test test_screens --dart-define=SCREENS_OUT=<folder> [--dart-define=SIZES=all]`.
+- Confirmation codes (`SasCode`) exist in the gallery only until Phase 7 pairing.

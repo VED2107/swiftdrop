@@ -59,6 +59,14 @@ ThemeData sdTheme({TargetPlatform? platform}) {
       radius: const Radius.circular(SdRadius.pill),
       thickness: WidgetStateProperty.all(6),
     ),
+    // Menus sit above everything and stay solid (no third live blur).
+    popupMenuTheme: PopupMenuThemeData(
+      color: const Color(0xFF26262B),
+      surfaceTintColor: const Color(0x00000000),
+      elevation: 12,
+      shape: RoundedSuperellipseBorder(borderRadius: SdRadius.all(SdRadius.row), side: const BorderSide(color: SdColors.hairlineStrong)),
+      textStyle: text.body,
+    ),
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(color: const Color(0xFF26262B), borderRadius: SdRadius.all(SdRadius.chip)),
       textStyle: text.caption.copyWith(color: SdColors.text),

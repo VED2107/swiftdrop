@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:swiftdrop_core/swiftdrop_core.dart';
 
+import '../../app/app.dart';
 import '../../app/providers.dart';
+import '../../app/router.dart';
+import '../../app/shell.dart';
 import '../../design/design.dart';
+import '../devices/device_actions.dart';
+import '../receive/receive_screen.dart';
 import '../screen_frame.dart';
 import '../transfers/transfer_rows.dart';
 
@@ -14,17 +20,57 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final devices = ref.watch(devicesProvider).value ?? const <Device>[];
     final history = ref.watch(historyProvider).value ?? const <TransferRecord>[];
+    final transfers = ref.watch(transfersProvider).value ?? const <TransferSnapshot>[];
+    final active = transfers.where((t) => !t.phase.isFinished).toList();
     final nearby = devices.where((d) => d.status != DeviceStatus.offline).toList();
+    final known = devices.where((d) => d.status == DeviceStatus.offline).take(4).toList();
+    final engineError = EngineStatus.of(context);
+    final t = context.sdText;
 
     return ScreenFrame(
       title: 'SwiftDrop',
+      subtitle: 'Send anything. Directly.',
       actions: const [HomeActions()],
+      panel: const ReceiveCard(compact: true),
       children: [
-        const SectionHeader('Nearby'),
-        if (nearby.isEmpty) const _NobodyNearby() else _DeviceStrip(devices: nearby),
-        const SectionHeader('Recent'),
+        if (engineError != null) ...[
+          const SizedBox(height: SdSpace.s6),
+          const InlineBanner(
+            tone: BannerTone.warning,
+            icon: SdIcons.failed,
+            title: 'Transfers aren’t available right now',
+            message: 'SwiftDrop couldn’t start its local connection. Restart the app; if it keeps happening, check that no other program blocks it.',
+          ),
+        ],
+        for (final a in active.take(2)) ...[
+          const SizedBox(height: SdSpace.s6),
+          TransferGlassCard(transfer: a, onOpen: () => context.push(Routes.transfer(a.transferId))),
+        ],
+        SectionHeader(
+          'Nearby',
+          trailing: nearby.isEmpty && known.isEmpty
+              ? null
+              : GlassButton(label: 'Connect', kind: GlassButtonKind.quiet, compact: true, icon: SdIcons.send, onPressed: () => context.push(Routes.pair)),
+        ),
+        if (nearby.isEmpty && known.isEmpty)
+          EmptyState(
+            icon: SdIcons.local,
+            title: 'No devices yet',
+            message: 'Open SwiftDrop on your other device, on the same Wi-Fi or hotspot, and connect with the address it shows.',
+            action: PrimaryAction(label: 'Connect a device', icon: SdIcons.connect, onPressed: () => context.push(Routes.pair)),
+          )
+        else
+          DeviceField(devices: [...nearby, ...known], trailing: const ConnectTile()),
+        const SizedBox(height: SdSpace.s6),
+        const _PhoneToPhoneCard(),
+        SectionHeader(
+          'Recent',
+          trailing: history.isEmpty
+              ? null
+              : GlassButton(label: 'See all', kind: GlassButtonKind.quiet, compact: true, onPressed: () => context.go(Routes.transfers)),
+        ),
         if (history.isEmpty)
-          Text('Nothing sent or received yet.', style: context.sdText.body.copyWith(color: SdColors.text2))
+          Text('Nothing sent or received yet.', style: t.body.copyWith(color: SdColors.text2))
         else
           TransferRecordGroup(records: history.take(3).toList()),
       ],
@@ -32,61 +78,40 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-/// Send / Receive. Equal access: Send is primary, Receive is never hidden.
-/// Both open flows that arrive with the engine (Phase 4); until then they're disabled.
-class HomeActions extends StatelessWidget {
-  const HomeActions({super.key, this.inDock = false});
-  final bool inDock;
+/// The core feature, named plainly: two phones, direct, no computer.
+class _PhoneToPhoneCard extends StatelessWidget {
+  const _PhoneToPhoneCard();
 
   @override
   Widget build(BuildContext context) {
-    final send = PrimaryAction(label: 'Send files', icon: SdIcons.send, expand: inDock, onPressed: null);
-    final receive = SecondaryAction(label: 'Receive', icon: SdIcons.receive, expand: inDock, onPressed: null);
-    if (!inDock) return Row(mainAxisSize: MainAxisSize.min, children: [send, const SizedBox(width: SdSpace.s3), receive]);
-    return Row(children: [Expanded(flex: 3, child: send), const SizedBox(width: SdSpace.s2), Expanded(flex: 2, child: receive)]);
-  }
-}
-
-class _DeviceStrip extends StatelessWidget {
-  const _DeviceStrip({required this.devices});
-  final List<Device> devices;
-
-  @override
-  Widget build(BuildContext context) {
-    final layout = SdLayout.of(context);
-    if (layout.isPhone) {
-      // Horizontal strip that isn't clipped at the gutter, so scrolled cards run to the
-      // screen edge and the strip reads as spatial. Height comes from the cards, so larger
-      // text never clips them.
-      return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          for (var i = 0; i < devices.length; i++) ...[
-            if (i > 0) const SizedBox(width: SdSpace.s3),
-            DeviceGlassCard(device: devices[i], width: 172, onSend: () {}),
-          ],
+    final t = context.sdText;
+    return Pressable(
+      onPressed: () => context.push(Routes.phoneToPhone),
+      semanticLabel: 'Phone to phone. Direct transfer, no computer needed.',
+      haptic: false,
+      child: LiquidGlass(
+        level: GlassLevel.elevated,
+        interactive: true,
+        padding: const EdgeInsets.all(SdSpace.s5),
+        child: Row(children: [
+          const SizedBox(
+            width: 100,
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              DeviceGlyph(kind: DeviceKind.phone, size: 38),
+              Icon(SdIcons.direct, size: 16, color: SdColors.redOnDark),
+              DeviceGlyph(kind: DeviceKind.phone, size: 38),
+            ]),
+          ),
+          const SizedBox(width: SdSpace.s4),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Phone to phone', style: t.bodyStrong),
+              Text('Direct transfer. No computer needed.', style: t.caption),
+            ]),
+          ),
+          const Icon(SdIcons.chevron, color: SdColors.text3, size: 18),
         ]),
-      );
-    }
-    return Wrap(
-      spacing: SdSpace.s4,
-      runSpacing: SdSpace.s4,
-      children: [for (final d in devices) DeviceGlassCard(device: d, width: 208, onSend: () {})],
-    );
-  }
-}
-
-class _NobodyNearby extends StatelessWidget {
-  const _NobodyNearby();
-
-  @override
-  Widget build(BuildContext context) {
-    return const EmptyState(
-      icon: SdIcons.local,
-      title: 'No devices nearby yet',
-      message: 'Devices show up here when SwiftDrop is open on them and they share your Wi-Fi or hotspot.',
-      action: SecondaryAction(label: 'Connect with a code', icon: SdIcons.qr, onPressed: null),
+      ),
     );
   }
 }

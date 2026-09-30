@@ -77,7 +77,7 @@ class GlassButton extends StatelessWidget {
           ),
           child: content,
         ),
-      GlassButtonKind.secondary => LiquidGlass(level: GlassLevel.card, radius: SdRadius.pill, child: content),
+      GlassButtonKind.secondary => LiquidGlass(level: GlassLevel.elevated, radius: SdRadius.pill, child: content),
       GlassButtonKind.quiet => content,
     };
 

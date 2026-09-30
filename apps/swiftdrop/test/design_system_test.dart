@@ -39,7 +39,7 @@ void main() {
 
   test('text contrast on the environment', () {
     // Worst case: the brightest glass fill over the ground.
-    final surface = Color.alphaBlend(SdMaterials.spec(GlassLevel.sheet, GlassMode.full).fill, SdColors.ground);
+    final surface = Color.alphaBlend(SdMaterials.spec(GlassLevel.sheet, GlassMode.full).fillTop, SdColors.ground);
     double contrast(Color fg, Color bg) {
       final a = Color.alphaBlend(fg, bg).computeLuminance(), b = bg.computeLuminance();
       return (a > b ? a + 0.05 : b + 0.05) / (a > b ? b + 0.05 : a + 0.05);
@@ -80,7 +80,7 @@ void main() {
       ),
     )));
     await tester.pumpAndSettle();
-    expect(find.bySemanticsLabel('MacBook Pro, Mac, available'), findsOneWidget);
+    expect(find.bySemanticsLabel('MacBook Pro, Mac, ready'), findsOneWidget);
     handle.dispose();
   });
 }

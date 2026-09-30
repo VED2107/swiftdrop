@@ -18,7 +18,7 @@ class EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.sdText;
     return LiquidGlass(
-      level: GlassLevel.surface,
+      level: GlassLevel.regular,
       padding: const EdgeInsets.all(SdSpace.s6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

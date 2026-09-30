@@ -1,14 +1,21 @@
 /// SwiftDrop design system. Screens import this and nothing below it.
 library;
 
+export 'components/completion_mark.dart';
 export 'components/device_glass_card.dart';
 export 'components/empty_state.dart';
+export 'components/files.dart';
+export 'components/forms.dart';
 export 'components/glass_button.dart';
 export 'components/glass_navigation.dart';
 export 'components/glass_sheet.dart';
 export 'components/pressable.dart';
+export 'components/progress.dart';
+export 'components/qr_glass.dart';
 export 'components/segmented_glass.dart';
 export 'components/status.dart';
+export 'components/transfer_glass_card.dart';
+export 'components/transfer_visual.dart';
 export 'icons/sd_icons.dart';
 export 'materials/ambient_background.dart';
 export 'materials/liquid_glass.dart';

@@ -1,8 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:swiftdrop_core/swiftdrop_core.dart';
 
+import '../../app/picking.dart';
 import '../../app/providers.dart';
+import '../../app/router.dart';
 import '../../design/design.dart';
 import '../screen_frame.dart';
 import 'transfer_rows.dart';
@@ -13,19 +18,52 @@ class TransfersScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final history = ref.watch(historyProvider).value ?? const <TransferRecord>[];
+    final live = (ref.watch(transfersProvider).value ?? const <TransferSnapshot>[]).where((t) => !t.phase.isFinished).toList();
     final groups = groupByDay(history, DateTime.now());
+    final desktop = !(Platform.isAndroid || Platform.isIOS);
+
+    void menu(TransferRecord r, Offset at) => showGlassMenu(context, at, [
+          if (desktop && r.location != null)
+            (label: 'Show in folder', icon: SdIcons.openFolder, onTap: () => revealFolder(r.location!), danger: false),
+          (label: 'Remove from history', icon: SdIcons.forget, onTap: () => ref.read(transferHistoryProvider).remove(r.transferId), danger: true),
+        ]);
+
     return ScreenFrame(
       title: 'Transfers',
+      actions: [
+        if (history.isNotEmpty)
+          GlassButton(
+            label: 'Clear history',
+            kind: GlassButtonKind.quiet,
+            compact: true,
+            onPressed: () async {
+              final ok = await confirmSheet(
+                context,
+                title: 'Clear history?',
+                message: 'Only the list is cleared. Files you received stay where they are.',
+                confirm: 'Clear history',
+              );
+              if (ok) await ref.read(transferHistoryProvider).clear();
+            },
+          ),
+      ],
       children: [
-        if (history.isEmpty) ...[
+        if (live.isNotEmpty) ...[
+          const SectionHeader('Now'),
+          for (final t in live) ...[
+            TransferGlassCard(transfer: t, onOpen: () => context.push(Routes.transfer(t.transferId))),
+            const SizedBox(height: SdSpace.s3),
+          ],
+        ],
+        if (history.isEmpty && live.isEmpty) ...[
           const SizedBox(height: SdSpace.s6),
           const EmptyState(
             icon: SdIcons.transfers,
             title: 'No transfers yet',
-            message: 'Everything you send or receive is listed here, with its size, speed and whether it arrived intact.',
+            message: 'Everything you send or receive is listed here, with its size, speed and whether every file arrived intact.',
           ),
         ],
-        for (final g in groups) ...[SectionHeader(g.label), TransferRecordGroup(records: g.records)],
+        for (final g in groups) ...[SectionHeader(g.label), TransferRecordGroup(records: g.records, onSecondary: menu)],
       ],
     );
   }

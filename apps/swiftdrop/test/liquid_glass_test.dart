@@ -7,8 +7,8 @@ import 'helpers.dart';
 void main() {
   testWidgets('surface and card levels never blur the backdrop', (tester) async {
     await tester.pumpWidget(harness(const Column(mainAxisSize: MainAxisSize.min, children: [
-      LiquidGlass(level: GlassLevel.surface, child: SizedBox(width: 100, height: 40)),
-      LiquidGlass(level: GlassLevel.card, child: SizedBox(width: 100, height: 40)),
+      LiquidGlass(level: GlassLevel.regular, child: SizedBox(width: 100, height: 40)),
+      LiquidGlass(level: GlassLevel.elevated, child: SizedBox(width: 100, height: 40)),
     ])));
     expect(find.byType(BackdropFilter), findsNothing);
     expect(GlassBudget.instance.active.value, 0);
@@ -61,15 +61,15 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Open sheet'));
     await tester.pumpAndSettle();
-    expect(find.text('Incoming transfer'), findsOneWidget);
+    expect(find.text('Confirm this code matches'), findsOneWidget);
     expect(GlassBudget.instance.active.value, lessThanOrEqualTo(SdMaterials.blurBudget));
-    await tester.tap(find.text('Accept'));
+    await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
-    expect(find.text('Incoming transfer'), findsNothing);
+    expect(find.text('Confirm this code matches'), findsNothing);
   });
 
   test('glass levels step up in lift', () {
-    final fills = GlassLevel.values.map((l) => SdMaterials.spec(l, GlassMode.full).fill.a).toList();
+    final fills = GlassLevel.values.map((l) => SdMaterials.spec(l, GlassMode.full).fillTop.a).toList();
     for (var i = 1; i < fills.length; i++) {
       expect(fills[i], greaterThan(fills[i - 1]));
     }

@@ -121,11 +121,11 @@ class _Tab extends StatelessWidget {
         focusRadius: SdRadius.row,
         child: ExcludeSemantics(
           child: SizedBox(
-            height: 52,
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            height: 56,
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, mainAxisSize: MainAxisSize.min, children: [
               Icon(selected ? d.selectedIcon : d.icon, size: 22, color: color),
               const SizedBox(height: 3),
-              Text(d.label, style: context.sdText.caption.copyWith(fontSize: 11, height: 1.2, color: color, fontWeight: FontWeight.w500)),
+              Text(d.label, style: context.sdText.micro.copyWith(color: color)),
             ]),
           ),
         ),

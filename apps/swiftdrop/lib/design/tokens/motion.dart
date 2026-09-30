@@ -17,6 +17,9 @@ abstract final class SdMotion {
   static const page = Duration(milliseconds: 260);
   static const sheet = Duration(milliseconds: 320);
 
+  /// Slow "waiting" breath (pairing): calm, clearly not progress.
+  static const breath = Duration(milliseconds: 2200);
+
   /// Energy change of the environment when a transfer starts or stops.
   static const ambientShift = Duration(milliseconds: 600);
 

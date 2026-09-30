@@ -23,7 +23,8 @@
     "bench:primitives": "tsx tests/performance/primitives.ts",
     "bench:check": "tsx tests/performance/bench.ts --check",
     "build:installer": "node scripts/build-installer.mjs",
-    "build:icons": "node scripts/build-icons.mjs"
+    "build:icons": "node scripts/build-icons.mjs",
+    "vectors": "tsx tests/vectors/generate.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

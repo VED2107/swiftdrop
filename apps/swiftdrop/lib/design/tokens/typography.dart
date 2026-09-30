@@ -19,6 +19,8 @@ class SdTextStyles extends ThemeExtension<SdTextStyles> {
     required this.numericHero,
     required this.numeric,
     required this.numericSmall,
+    required this.micro,
+    required this.numericMedium,
   });
 
   /// Screen titles ("SwiftDrop", "Transfers").
@@ -45,6 +47,12 @@ class SdTextStyles extends ThemeExtension<SdTextStyles> {
   final TextStyle numeric;
   final TextStyle numericSmall;
 
+  /// Tiny labels: tab names, "This device", roles under glyphs.
+  final TextStyle micro;
+
+  /// Readouts in stat rows (percent, speed, remaining).
+  final TextStyle numericMedium;
+
   static const _tabular = [FontFeature.tabularFigures()];
 
   /// [base] carries the platform font family; roles only set size, weight, tracking.
@@ -69,6 +77,8 @@ class SdTextStyles extends ThemeExtension<SdTextStyles> {
       numericHero: s(56, 56, FontWeight.w600, tracking: -1.2).copyWith(fontFeatures: _tabular),
       numeric: s(20, 24, FontWeight.w600, tracking: -0.3).copyWith(fontFeatures: _tabular),
       numericSmall: s(13, 18, FontWeight.w500, color: SdColors.text2).copyWith(fontFeatures: _tabular),
+      micro: s(11, 14, FontWeight.w500, color: SdColors.text2),
+      numericMedium: s(18, 22, FontWeight.w600, tracking: -0.2).copyWith(fontFeatures: _tabular),
     );
   }
 

@@ -41,26 +41,37 @@ abstract interface class FileSink {
   Future<void> close();
 }
 
-/// Receiving storage. Mirrors `SinkFactory` in `packages/peer/src/receiver.ts`, plus
-/// the final placement step that the PC store does with an atomic rename.
+/// What happens when a received file's name is already taken (receiver's setting).
+enum DuplicatePolicy { keepBoth, replace, skip }
+
+/// Receiving storage. Mirrors `SinkFactory` in `packages/peer/src/receiver.ts`, plus the
+/// final placement the PC store does (atomic rename, duplicate naming, timestamps).
 abstract interface class SinkFactory {
+  /// Opens (or reopens, for resume) a file's partial data for positional writes.
   Future<FileSink> open(String transferId, String fileId, int size);
+
+  /// A whole small file in one call (batch frames). Implementations may run several of
+  /// these concurrently; the receiver awaits them together.
+  Future<void> writeWhole(String transferId, String fileId, Uint8List bytes);
 
   /// Root digest mismatch: throw this file's bytes away and start over.
   Future<void> discard(String transferId, String fileId);
 
-  /// Move a verified file to its final place. Returns the name it was stored under
-  /// (may differ from [name] when keeping both copies of a duplicate).
+  /// Is [name] already taken in [relDir] at the destination?
+  Future<bool> exists(List<String> relDir, String name);
+
+  /// Moves a verified file into place. With [replace] false a taken name gets a number
+  /// (`name (2).ext`). Returns the path it was stored under, relative to the destination.
   Future<String> finish(
     String transferId,
     String fileId, {
+    required List<String> relDir,
     required String name,
-    required String relDir,
-    required String type,
     required int lastModified,
+    required bool replace,
   });
 
-  /// Drop everything of a transfer (cancel / decline).
+  /// Drop everything of a transfer (cancel / decline / finished bookkeeping).
   Future<void> remove(String transferId);
 
   /// Bytes available for new files, or null when the platform can't tell.

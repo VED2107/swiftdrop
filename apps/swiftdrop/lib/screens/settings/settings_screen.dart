@@ -1,84 +1,174 @@
+import 'dart:io';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:swiftdrop_core/swiftdrop_core.dart';
 
+import '../../app/picking.dart';
 import '../../app/providers.dart';
 import '../../app/router.dart';
 import '../../design/design.dart';
 import '../screen_frame.dart';
 
-/// Settings. Phase 2 carries Appearance (it drives the material system) and About; the
-/// Transfer, Connection and Privacy sections arrive with the features they configure.
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final prefs = ref.watch(appearanceProvider);
-    final settings = ref.read(appearanceProvider.notifier);
-    return ScreenFrame(
-      title: 'Settings',
-      children: [
-        const SectionHeader('Appearance'),
-        LiquidGlass(
-          level: GlassLevel.surface,
-          padding: const EdgeInsets.all(SdSpace.s4),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            _Choice<GlassMode>(
-              title: 'Glass',
-              help: 'Subtle drops the background blur; Off uses solid surfaces.',
-              value: prefs.glass,
-              options: const {GlassMode.full: 'Full', GlassMode.subtle: 'Subtle', GlassMode.off: 'Off'},
-              onChanged: settings.setGlass,
-            ),
-            const Padding(padding: EdgeInsets.symmetric(vertical: SdSpace.s4), child: Divider(height: 1, color: SdColors.hairline)),
-            _Choice<MotionPreference>(
-              title: 'Motion',
-              help: 'Reduced keeps fades and drops movement. System follows your device setting.',
-              value: prefs.motion,
-              options: const {MotionPreference.system: 'System', MotionPreference.reduced: 'Reduced', MotionPreference.full: 'Full'},
-              onChanged: settings.setMotion,
-            ),
-          ]),
-        ),
-        const SectionHeader('About'),
-        LiquidGlass(
-          level: GlassLevel.surface,
-          padding: const EdgeInsets.all(SdSpace.s4),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('SwiftDrop', style: context.sdText.bodyStrong),
-            const SizedBox(height: 2),
-            Text('Moves files directly between your devices. Nothing passes through a server.', style: context.sdText.caption),
-            if (kDebugMode) ...[
-              const SizedBox(height: SdSpace.s4),
-              SecondaryAction(label: 'Design gallery', compact: true, onPressed: () => context.push(Routes.gallery)),
-            ],
-          ]),
-        ),
-      ],
-    );
-  }
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-/// A labelled setting with its help line and a segmented control.
-class _Choice<T> extends StatelessWidget {
-  const _Choice({required this.title, required this.help, required this.value, required this.options, required this.onChanged});
-  final String title;
-  final String help;
-  final T value;
-  final Map<T, String> options;
-  final ValueChanged<T> onChanged;
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  String? _folderError;
+
+  Future<void> _changeFolder() async {
+    final dir = await getDirectoryPath(confirmButtonText: 'Save here');
+    if (dir == null) return;
+    try {
+      await ref.read(settingsProvider.notifier).setDownloadDir(dir);
+      setState(() => _folderError = null);
+    } on TransportException {
+      setState(() => _folderError = 'Finish or cancel the transfer that’s arriving, then change the folder.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final t = context.sdText;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text(title, style: t.bodyStrong),
-      const SizedBox(height: 2),
-      Text(help, style: t.caption),
-      const SizedBox(height: SdSpace.s3),
-      SegmentedGlass<T>(label: title, value: value, options: options, onChanged: onChanged),
-    ]);
+    final prefs = ref.watch(settingsProvider);
+    final settings = ref.read(settingsProvider.notifier);
+    final ep = ref.watch(endpointProvider).value;
+    final engine = ref.watch(engineProvider);
+    final desktop = !(Platform.isAndroid || Platform.isIOS);
+
+    return ScreenFrame(
+      title: 'Settings',
+      maxWidth: 720,
+      children: [
+        SettingsGroup(
+          title: 'Transfer',
+          footer: _folderError,
+          children: [
+            SettingsRow(
+              title: 'Save received files to',
+              icon: SdIcons.folder,
+              detail: prefs.downloadDir ?? 'Downloads',
+              trailing: desktop
+                  ? Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (prefs.downloadDir != null)
+                        GlassButton(label: 'Show', kind: GlassButtonKind.quiet, compact: true, onPressed: () => revealFolder(prefs.downloadDir!)),
+                      GlassButton(label: 'Change', kind: GlassButtonKind.secondary, compact: true, onPressed: _changeFolder),
+                    ])
+                  : null,
+            ),
+            SettingsRow(
+              title: 'When a file already exists',
+              icon: SdIcons.copy,
+              below: SegmentedGlass<DuplicatePolicy>(
+                label: 'When a file already exists',
+                value: prefs.duplicates,
+                options: const {DuplicatePolicy.keepBoth: 'Keep both', DuplicatePolicy.replace: 'Replace', DuplicatePolicy.skip: 'Skip'},
+                onChanged: settings.setDuplicates,
+              ),
+            ),
+            const SettingsRow(
+              title: 'Accept automatically',
+              icon: SdIcons.receive,
+              detail: 'Every transfer asks first. Automatic acceptance for your own devices arrives with secure pairing.',
+              trailing: GlassSwitch(value: false, onChanged: null, label: 'Accept automatically'),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          title: 'Connection',
+          footer: 'Transfers stay on your local network. There’s no account and no server in between.',
+          children: [
+            SettingsRow(
+              title: 'This device',
+              icon: SdIcons.device(desktop ? DeviceKind.desktop : DeviceKind.phone),
+              detail: ep == null ? 'Starting…' : 'Visible as ${ep.name}',
+              onTap: engine == null || ep == null
+                  ? null
+                  : () async {
+                      final name = await showRenameSheet(context, title: 'Name this device', current: ep.name);
+                      if (name != null) await engine.setName(name);
+                    },
+            ),
+            SettingsRow(title: 'Address', icon: SdIcons.local, detail: ep?.primary ?? 'Not on a network'),
+            SettingsRow(title: 'Connect a device', icon: SdIcons.connect, onTap: () => context.push(Routes.pair)),
+          ],
+        ),
+        SettingsGroup(
+          title: 'Appearance',
+          children: [
+            SettingsRow(
+              title: 'Glass',
+              detail: 'Subtle drops the background blur; Off uses solid surfaces.',
+              below: SegmentedGlass<GlassMode>(
+                label: 'Glass',
+                value: prefs.glass,
+                options: const {GlassMode.full: 'Full', GlassMode.subtle: 'Subtle', GlassMode.off: 'Off'},
+                onChanged: settings.setGlass,
+              ),
+            ),
+            SettingsRow(
+              title: 'Motion',
+              detail: 'Reduced keeps fades and drops movement. System follows your device.',
+              below: SegmentedGlass<MotionPreference>(
+                label: 'Motion',
+                value: prefs.motion,
+                options: const {MotionPreference.system: 'System', MotionPreference.reduced: 'Reduced', MotionPreference.full: 'Full'},
+                onChanged: settings.setMotion,
+              ),
+            ),
+            SettingsRow(
+              title: 'High contrast',
+              detail: 'Solid surfaces and no blur. On automatically when your device asks for it.',
+              below: SegmentedGlass<ContrastPreference>(
+                label: 'High contrast',
+                value: prefs.contrast,
+                options: const {ContrastPreference.system: 'System', ContrastPreference.high: 'On'},
+                onChanged: settings.setContrast,
+              ),
+            ),
+          ],
+        ),
+        const SettingsGroup(
+          title: 'Privacy',
+          children: [
+            SettingsRow(
+              title: 'Who can reach this device',
+              icon: SdIcons.visibility,
+              detail: 'Devices on your network that know its address. Nothing is received without your Accept.',
+            ),
+            SettingsRow(
+              title: 'Your files',
+              icon: SdIcons.privacy,
+              detail: 'Sent directly between your devices and checked block by block. SwiftDrop keeps no copies and collects no data.',
+            ),
+          ],
+        ),
+        SettingsGroup(
+          title: 'Notifications',
+          children: [
+            SettingsRow(
+              title: 'Sound for incoming transfers',
+              icon: SdIcons.notifications,
+              detail: 'Plays when another device asks to send you files.',
+              trailing: GlassSwitch(value: prefs.notifyIncoming, onChanged: settings.setNotify, label: 'Sound for incoming transfers'),
+            ),
+          ],
+        ),
+        SettingsGroup(
+          title: 'About',
+          children: [
+            const SettingsRow(title: 'SwiftDrop', detail: 'Version 0.3.0 (preview)'),
+            SettingsRow(title: 'Open-source licenses', onTap: () => showLicensePage(context: context, applicationName: 'SwiftDrop')),
+            if (kDebugMode) SettingsRow(title: 'Design gallery', onTap: () => context.push(Routes.gallery)),
+          ],
+        ),
+      ],
+    );
   }
 }

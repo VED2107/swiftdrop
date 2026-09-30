@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import '../platform/files.dart';
 import '../platform/system.dart';
 import '../transport/link.dart';
 import '../services/models.dart';
@@ -74,6 +73,13 @@ class DemoDeviceDirectory implements DeviceDirectory {
     _devices.removeWhere((d) => d.id == deviceId);
     _out.add(List.unmodifiable(_devices));
   }
+
+  @override
+  Stream<LocalEndpoint?> endpoint() =>
+      Stream.value(const LocalEndpoint(deviceId: 'demo-self', name: 'This PC', addresses: ['192.168.1.20'], port: 47800));
+
+  @override
+  Future<Device> connect(String address) async => _devices.first;
 }
 
 /// One scripted transfer that loops: sending 24 files / 1.8 GB to "Ved's iPhone".
@@ -157,7 +163,7 @@ class DemoTransferService implements TransferService {
   }
 
   @override
-  Future<String> send(String deviceId, List<FileSource> files) async {
+  Future<String> send(String deviceId, List<SendItem> items) async {
     final id = 'demo-transfer-${_transfers.length + 1}';
     _start(id);
     return id;
@@ -196,6 +202,12 @@ class DemoTransferService implements TransferService {
       path: t.path,
       startedAt: t.startedAt,
     );
+    _emit();
+  }
+
+  @override
+  Future<void> dismiss(String transferId) async {
+    _transfers.remove(transferId);
     _emit();
   }
 

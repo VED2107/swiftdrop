@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-04T00:00:00Z",
+  "title": "Design System: SwiftDrop /p2p/",
+  "scope": "The /p2p/ surface only (apps/web/p2p.html, src/p2p/P2PApp.tsx, src/p2p/p2p.css). The PC app at apps/web/index.html keeps its own lime 'Quiet Signal' world in src/styles.css and is not described here.",
+  "extensions": {
+    "colorMeta": {
+      "swiftdrop-red": { "role": "primary", "displayName": "SwiftDrop Red", "canonical": "#d8322a", "source": "apps/swiftdrop/lib/design/tokens/colors.dart SdColors.red", "tonalRamp": ["#2e0907", "#55120e", "#7e1a14", "#a91f18", "#d8322a", "#ef4236", "#ff8a80", "#ffd9d5"] },
+      "red-lit": { "role": "primary", "displayName": "Lit Red", "canonical": "#ef4236" },
+      "red-deep": { "role": "primary", "displayName": "Deep Red", "canonical": "#a91f18" },
+      "red-on-dark": { "role": "primary", "displayName": "Red on Dark", "canonical": "#ff8a80", "source": "SdColors.redOnDark" },
+      "red-wash": { "role": "primary", "displayName": "Red Wash", "canonical": "rgb(216 50 42 / 0.14)" },
+      "on-red": { "role": "primary", "displayName": "On Red", "canonical": "#ffffff" },
+      "graphite-ground": { "role": "neutral", "displayName": "Graphite Ground", "canonical": "#0e0e10", "source": "SdColors.ground", "tonalRamp": ["#050506", "#0a0a0c", "#0e0e10", "#17171a", "#1c1c20", "#26262b", "#3a3a41", "#8a8a92"] },
+      "graphite-sink": { "role": "neutral", "displayName": "Graphite Sink", "canonical": "#0a0a0c" },
+      "graphite-surface": { "role": "neutral", "displayName": "Graphite Surface", "canonical": "#17171a" },
+      "graphite-surface-2": { "role": "neutral", "displayName": "Graphite Surface 2", "canonical": "#1c1c20" },
+      "graphite-surface-3": { "role": "neutral", "displayName": "Graphite Surface 3", "canonical": "#26262b" },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "rgb(255 255 255 / 0.08)" },
+      "hairline-strong": { "role": "neutral", "displayName": "Hairline Strong", "canonical": "rgb(255 255 255 / 0.14)" },
+      "text": { "role": "neutral", "displayName": "Text", "canonical": "rgb(255 255 255 / 0.94)" },
+      "text-2": { "role": "neutral", "displayName": "Text 2", "canonical": "rgb(255 255 255 / 0.66)" },
+      "text-3": { "role": "neutral", "displayName": "Text 3", "canonical": "rgb(255 255 255 / 0.5)" },
+      "text-4": { "role": "neutral", "displayName": "Text 4", "canonical": "rgb(255 255 255 / 0.36)" },
+      "qr-paper": { "role": "neutral", "displayName": "QR Paper", "canonical": "#fafafa", "source": "SdColors.qrPaper" },
+      "ambient-cool": { "role": "neutral", "displayName": "Ambient Cool", "canonical": "#3a4150", "source": "SdColors.ambientCool" },
+      "verified-green": { "role": "state", "displayName": "Verified Green", "canonical": "#6fdc9c", "tonalRamp": ["#0f2f1c", "#1a4d30", "#276b44", "#378a5a", "#4fb37a", "#6fdc9c", "#a5ebc2", "#dbf7e7"] },
+      "warning-apricot": { "role": "state", "displayName": "Warning Apricot", "canonical": "#ffb38a", "source": "SdColors.warning", "tonalRamp": ["#3a1d0d", "#5e3016", "#874822", "#b06331", "#d98448", "#ffb38a", "#ffd1b6", "#ffeee4"] },
+      "warning-wash": { "role": "state", "displayName": "Warning Wash", "canonical": "rgb(255 179 138 / 0.12)" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Home headline only; second line dimmed to text-4." },
+      "speed-numeral": { "displayName": "Speed Numeral", "purpose": "Live MB/s in the transfer meter; tabular." },
+      "headline": { "displayName": "Headline", "purpose": "Screen titles and the transfer file name." },
+      "title": { "displayName": "Title", "purpose": "Choice tile titles." },
+      "section": { "displayName": "Section", "purpose": "Pane headings such as Recent transfers." },
+      "body": { "displayName": "Body / Lead", "purpose": "Explanatory lines under headlines, max 44ch, text-2." },
+      "row-title": { "displayName": "Row Title", "purpose": "List row titles." },
+      "label": { "displayName": "Label", "purpose": "Pills and chips." },
+      "mono": { "displayName": "Mono", "purpose": "Pasted codes and the debug panel only." }
+    },
+    "shadows": [
+      { "name": "glass-edge", "value": "inset 0 1px 0 rgb(255 255 255 / 0.1), inset 0 0 0 1px rgb(255 255 255 / 0.075)", "purpose": "Border of every glass surface, pill, field and button." },
+      { "name": "glass-drop", "value": "0 24px 60px -28px rgb(0 0 0 / 0.85)", "purpose": "Lift under cards, tiles and the viewfinder." },
+      { "name": "window-drop", "value": "0 40px 120px -40px rgb(0 0 0 / 0.9)", "purpose": "Desktop app window only." },
+      { "name": "red-glow", "value": "inset 0 1px 0 rgb(255 255 255 / 0.22), 0 12px 28px -12px rgb(216 50 42 / 0.75)", "purpose": "Primary buttons." },
+      { "name": "red-glow-tile", "value": "inset 0 1px 0 rgb(255 255 255 / 0.25), 0 24px 50px -22px rgb(216 50 42 / 0.9)", "purpose": "Send choice tile." },
+      { "name": "bar-glow", "value": "0 0 18px rgb(239 66 54 / 0.45)", "purpose": "Progress fill while data moves." }
+    ],
+    "materials": [
+      { "name": "glass-fill", "value": "linear-gradient(180deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.04))", "purpose": "Fill of every glass surface." },
+      { "name": "glass-blur", "value": "blur(24px) saturate(150%)", "purpose": "backdrop-filter for cards and tiles; 20px on buttons, 30px saturate(140%) on the desktop window." },
+      { "name": "reduced-transparency-fallback", "value": "background: #1c1c20; backdrop-filter: none", "purpose": "All glass under prefers-reduced-transparency." },
+      { "name": "ground-bloom", "value": "radial-gradient(48rem 30rem at 50% -10rem, rgb(216 50 42 / 0.2), transparent 70%), radial-gradient(40rem 30rem at 110% 110%, rgb(58 65 80 / 0.35), transparent 70%), #0e0e10", "purpose": "Page background, fixed." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.23, 1, 0.32, 1)", "purpose": "Default easing (inherited from styles.css)." },
+      { "name": "d-micro", "value": "140ms", "purpose": "Press scale, colour changes." },
+      { "name": "d-ui", "value": "240ms", "purpose": "Shadow and state-dot transitions." },
+      { "name": "qr-in", "value": "420ms scale(0.96) + blur(6px) to rest", "purpose": "QR plate entrance." },
+      { "name": "mark-in", "value": "520ms scale(0.86) + blur(4px) to rest", "purpose": "Completion mark entrance." },
+      { "name": "bar-fill", "value": "transform 220ms linear", "purpose": "Progress fill." }
+    ],
+    "breakpoints": [
+      { "name": "desktop", "value": "960px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Red pill for the one action on a screen.",
+      "html": "<button class=\"ds-btn-primary\">Accept</button>",
+      "css": ".ds-btn-primary { height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: linear-gradient(180deg, #ef4236, #d8322a); color: #fff; font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 0.95rem; font-weight: 520; letter-spacing: -0.01em; box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 12px 28px -12px rgb(216 50 42 / 0.75); cursor: pointer; transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 240ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-btn-primary:hover { background: linear-gradient(180deg, #f34c40, #df372e); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 14px 34px -12px rgb(216 50 42 / 0.85); } .ds-btn-primary:active { transform: scale(0.97); } .ds-btn-primary:focus-visible { outline: 2px solid #ff8a80; outline-offset: 3px; } .ds-btn-primary:disabled { background: #1c1c20; color: rgb(255 255 255 / 0.36); box-shadow: none; }"
+    },
+    {
+      "name": "Glass Button",
+      "kind": "button",
+      "refersTo": "button-glass",
+      "description": "Frosted pill for Cancel and secondary actions.",
+      "html": "<button class=\"ds-btn-glass\">Cancel</button>",
+      "css": ".ds-btn-glass { height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: linear-gradient(180deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.04)); color: rgb(255 255 255 / 0.94); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), inset 0 0 0 1px rgb(255 255 255 / 0.075); backdrop-filter: blur(20px); font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 0.95rem; font-weight: 520; cursor: pointer; transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 140ms ease; } .ds-btn-glass:hover { background: linear-gradient(180deg, rgb(255 255 255 / 0.11), rgb(255 255 255 / 0.06)); } .ds-btn-glass:active { transform: scale(0.97); } .ds-btn-glass:focus-visible { outline: 2px solid #ff8a80; outline-offset: 3px; }"
+    },
+    {
+      "name": "Glass Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Pill input for pasting a pairing code.",
+      "html": "<input class=\"ds-field\" placeholder=\"Paste the code\" />",
+      "css": ".ds-field { height: 48px; padding: 0 16px; border: 0; border-radius: 999px; background: linear-gradient(180deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.04)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), inset 0 0 0 1px rgb(255 255 255 / 0.075); color: rgb(255 255 255 / 0.94); font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 0.9rem; } .ds-field::placeholder { color: rgb(255 255 255 / 0.5); } .ds-field:not(:placeholder-shown) { font-family: 'Geist Mono Variable', ui-monospace, monospace; } .ds-field:focus-visible { outline: 2px solid #ff8a80; outline-offset: 3px; }"
+    },
+    {
+      "name": "Status Pill",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "Top-bar pill naming the connection state and proven path.",
+      "html": "<span class=\"ds-pill\"><span class=\"ds-dot\" data-state=\"live\"></span>Direct · Local network</span>",
+      "css": ".ds-pill { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 999px; background: linear-gradient(180deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.04)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), inset 0 0 0 1px rgb(255 255 255 / 0.075); font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 0.82rem; font-weight: 520; color: rgb(255 255 255 / 0.66); } .ds-dot { width: 7px; height: 7px; border-radius: 50%; background: rgb(255 255 255 / 0.36); transition: background-color 240ms ease, box-shadow 240ms ease; } .ds-dot[data-state=live] { background: #6fdc9c; box-shadow: 0 0 0 3px rgb(111 220 156 / 0.16); } .ds-dot[data-state=warn] { background: #ffb38a; box-shadow: 0 0 0 3px rgb(255 179 138 / 0.12); }"
+    },
+    {
+      "name": "Verified Chip",
+      "kind": "chip",
+      "refersTo": "verified-chip",
+      "description": "Completion proof; green appears only here and on the live dot.",
+      "html": "<span class=\"ds-verified\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 6 9 17l-5-5\"/></svg>Verified</span>",
+      "css": ".ds-verified { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: 999px; background: rgb(111 220 156 / 0.12); color: #6fdc9c; font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-size: 0.82rem; font-weight: 560; }"
+    },
+    {
+      "name": "Choice Tiles",
+      "kind": "custom",
+      "refersTo": "choice-tile-send",
+      "description": "Home screen Send (red) and Receive (glass) tiles, side by side within thumb reach.",
+      "html": "<div class=\"ds-choices\"><button class=\"ds-choice\" data-tone=\"red\"><span class=\"ds-choice-icon\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m5 12 7-7 7 7\"/><path d=\"M12 19V5\"/></svg></span><span class=\"ds-choice-t\">Send</span><span class=\"ds-choice-s\">Choose files, show a code</span></button><button class=\"ds-choice\"><span class=\"ds-choice-icon\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 5v14\"/><path d=\"m19 12-7 7-7-7\"/></svg></span><span class=\"ds-choice-t\">Receive</span><span class=\"ds-choice-s\">Scan the sender&#39;s code</span></button></div>",
+      "css": ".ds-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 380px; } .ds-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 156px; padding: 18px; border: 0; border-radius: 24px; text-align: left; color: rgb(255 255 255 / 0.94); background: linear-gradient(180deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.04)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), inset 0 0 0 1px rgb(255 255 255 / 0.075), 0 24px 60px -28px rgb(0 0 0 / 0.85); backdrop-filter: blur(24px) saturate(150%); font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 240ms cubic-bezier(0.23, 1, 0.32, 1); } .ds-choice:hover { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), inset 0 0 0 1px rgb(255 255 255 / 0.14), 0 24px 60px -28px rgb(0 0 0 / 0.85); } .ds-choice:active { transform: scale(0.97); } .ds-choice:focus-visible { outline: 2px solid #ff8a80; outline-offset: 3px; } .ds-choice[data-tone=red] { background: radial-gradient(120% 90% at 20% 0%, rgb(255 255 255 / 0.16), transparent 60%), linear-gradient(160deg, #e5392f, #a91f18); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25), 0 24px 50px -22px rgb(216 50 42 / 0.9); } .ds-choice[data-tone=red]:hover { box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 28px 60px -22px rgb(216 50 42 / 1); } .ds-choice-icon { display: grid; place-items: center; width: 46px; height: 46px; margin-bottom: auto; border-radius: 50%; background: rgb(255 255 255 / 0.1); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12); } .ds-choice[data-tone=red] .ds-choice-icon { background: rgb(255 255 255 / 0.2); } .ds-choice-t { margin-top: 16px; font-size: 1.15rem; font-weight: 620; letter-spacing: -0.02em; } .ds-choice-s { min-height: 2.7em; font-size: 0.8rem; line-height: 1.35; color: rgb(255 255 255 / 0.7); }"
+    },
+    {
+      "name": "Transfer Meter",
+      "kind": "card",
+      "refersTo": "card-glass",
+      "description": "Glass card carrying live speed, percent, red progress bar and bytes.",
+      "html": "<div class=\"ds-meter\"><div class=\"ds-meter-top\"><span class=\"ds-speed\">48.2<small>MB/s</small></span><span class=\"ds-pct\">62%</span></div><div class=\"ds-bar\"><span style=\"transform: scaleX(0.62)\"></span></div><div class=\"ds-meter-foot\"><span>104 MB / 168 MB</span><span>About 2 s left</span></div></div>",
+      "css": ".ds-meter { display: flex; flex-direction: column; gap: 14px; max-width: 520px; padding: 22px 20px 18px; border-radius: 20px; background: linear-gradient(180deg, rgb(255 255 255 / 0.075), rgb(255 255 255 / 0.04)); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), inset 0 0 0 1px rgb(255 255 255 / 0.075), 0 24px 60px -28px rgb(0 0 0 / 0.85); backdrop-filter: blur(24px) saturate(150%); color: rgb(255 255 255 / 0.94); font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif; font-variant-numeric: tabular-nums; font-feature-settings: 'tnum', 'ss01'; } .ds-meter-top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; } .ds-speed { font-size: clamp(2.6rem, 2rem + 3vw, 3.6rem); font-weight: 560; letter-spacing: -0.05em; line-height: 1; } .ds-speed small { margin-left: 6px; font-size: 0.36em; font-weight: 520; letter-spacing: -0.01em; color: rgb(255 255 255 / 0.5); } .ds-pct { font-size: 1.25rem; font-weight: 560; color: rgb(255 255 255 / 0.66); } .ds-bar { position: relative; height: 8px; border-radius: 999px; overflow: hidden; background: rgb(255 255 255 / 0.08); } .ds-bar span { position: absolute; inset: 0; border-radius: inherit; transform-origin: left center; background: linear-gradient(90deg, #b9241d, #ef4236); box-shadow: 0 0 18px rgb(239 66 54 / 0.45); transition: transform 220ms linear; } .ds-meter-foot { display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem; color: rgb(255 255 255 / 0.5); } .ds-meter-foot span:first-child { color: rgb(255 255 255 / 0.66); }"
+    },
+    {
+      "name": "QR Plate",
+      "kind": "custom",
+      "refersTo": "qr-plate",
+      "description": "Flat near-white plate for the pairing code; never on glass, no centre mark.",
+      "html": "<div class=\"ds-qr\"><svg viewBox=\"0 0 21 21\" width=\"100%\" height=\"100%\" shape-rendering=\"crispEdges\"><path fill=\"#0e0e10\" d=\"M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0zM9 9h3v3H9zM15 15h2v2h-2zM9 2h2v2H9zM2 9h2v2H2z\"/><path fill=\"#fafafa\" d=\"M1 1h5v5H1zM15 1h5v5h-5zM1 15h5v5H1z\"/><path fill=\"#0e0e10\" d=\"M2 2h3v3H2zM16 2h3v3h-3zM2 16h3v3H2z\"/></svg></div>",
+      "css": ".ds-qr { width: 220px; aspect-ratio: 1; padding: 18px; border-radius: 28px; background: #fafafa; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.4) inset, 0 30px 70px -30px rgb(216 50 42 / 0.55), 0 20px 50px -20px rgb(0 0 0 / 0.8); animation: ds-qr-in 420ms cubic-bezier(0.23, 1, 0.32, 1) both; } @keyframes ds-qr-in { from { opacity: 0; transform: scale(0.96); filter: blur(6px); } } @media (prefers-reduced-motion: reduce) { .ds-qr { animation: none; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The App in the Browser",
+    "overview": "The /p2p/ page is the SwiftDrop app running in a browser tab, the same world as the native Flutter app: near-black graphite ground, frosted glass surfaces, and one red. Nothing on screen reads as a web page or a QR utility; it is one app window with a top bar, a single primary pane, and (on desktop) a side pane. Density is phone-first: one column at 480px max, thumb-reach tiles, big honest numbers.\n\nRed carries two meanings only: \"act here\" and \"data is moving\". It fills the Send tile, primary buttons, the progress bar, the completion mark and the brand mark; it blooms softly behind the hero device pair. Green is a status colour, not an accent: it appears on the live connection dot and the Verified chip. Everything else is white at stepped opacity on graphite.\n\nGlass is a web approximation of the native material: a faint white vertical gradient, a 1px inset edge plus a top highlight, backdrop blur with saturation, and a long soft drop. Under `prefers-reduced-transparency` every glass surface falls back to a solid graphite fill.",
+    "keyCharacteristics": [
+      "Graphite ground with a red radial bloom at the top and a cool ambient field at the bottom right.",
+      "Frosted glass for every container; no visible borders, only inset edges.",
+      "One red accent, gradient-lit (lighter top, deeper bottom) on fills.",
+      "Pill geometry for every control; 20-28px radii for containers.",
+      "Geist with tabular numerals for every live number.",
+      "The QR is a flat near-white plate, never on glass, never marked."
+    ],
+    "rules": [
+      { "name": "The One Red Rule", "body": "Red means \"act\" or \"data moving\". It is never decoration, never a second accent hue, and the web red is the native token: change it in colors.dart and here together.", "section": "colors" },
+      { "name": "The Status Is Not Accent Rule", "body": "Green and apricot are states. They never fill a button, a tile, or a headline.", "section": "colors" },
+      { "name": "The Plain Plate Rule", "body": "The QR sits on flat `qr-paper` with no centre mark, tint, blur or glass: a full SDP offer needs every module readable at arm's length.", "section": "colors" },
+      { "name": "The Tabular Numbers Rule", "body": "Every live number (speed, percent, bytes, time left, file counts) uses tabular figures (`\"tnum\", \"ss01\"`), so values update without jitter.", "section": "typography" },
+      { "name": "The Tracking Scales With Size Rule", "body": "Tracking tightens with size: -0.012em on rows, -0.02em on titles, -0.032em on headlines, -0.04 to -0.05em on display and speed.", "section": "typography" },
+      { "name": "The Glass Not Border Rule", "body": "Containers are defined by an inset white edge and blur, never by a solid stroke. The only real borders are the scanner corner brackets and the dashed drop zone.", "section": "elevation" },
+      { "name": "The Lit From Above Rule", "body": "Every fill gets a 1px inset top highlight and a top-to-bottom gradient, lighter at the top.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do take the red from the native token (#D8322A) and keep web and app on one red.",
+      "Do build every container from the glass recipe (fill, inset edge, blur, soft drop) and give it a solid `graphite-surface-2` fallback under `prefers-reduced-transparency`.",
+      "Do use full pills for every control and 20-28px radii for containers.",
+      "Do set every live number in tabular figures.",
+      "Do keep the QR on a flat `qr-paper` plate with no centre mark.",
+      "Do pair every warning colour with a word and an icon."
+    ],
+    "donts": [
+      "Don't add a second accent hue; green and apricot are status only.",
+      "Don't use red for decoration that does not mean \"act\" or \"data moving\".",
+      "Don't draw solid borders on containers; use the inset glass edge.",
+      "Don't put the QR on glass, tint it, or blur it.",
+      "Don't pull lime or other values from the PC app's \"Quiet Signal\" world into /p2p/."
+    ]
+  }
+}

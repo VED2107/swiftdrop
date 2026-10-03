@@ -29,6 +29,7 @@
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@swiftdrop/crypto": "workspace:*",
+    "@swiftdrop/peer": "workspace:*",
     "@swiftdrop/protocol": "workspace:*",
     "@swiftdrop/server": "workspace:*",
     "@swiftdrop/shared": "workspace:*",

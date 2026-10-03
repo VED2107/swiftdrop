@@ -1,0 +1,16 @@
+{
+  "at": "2026-10-04",
+  "harness": "tests/performance/raw-datachannel.ts: two separate headless Chromium processes, loopback, host candidates, no SwiftDrop code, 256 MiB blast with bufferedAmount backpressure",
+  "rows": [
+    { "frameKiB": 16, "highMiB": 1, "MBs": 14.7 },
+    { "frameKiB": 16, "highMiB": 4, "MBs": 8.3 },
+    { "frameKiB": 16, "highMiB": 16, "MBs": 12.3 },
+    { "frameKiB": 64, "highMiB": 1, "MBs": 15.8 },
+    { "frameKiB": 64, "highMiB": 4, "MBs": 19.9 },
+    { "frameKiB": 64, "highMiB": 16, "MBs": 22.6 },
+    { "frameKiB": 256, "highMiB": 1, "MBs": 15.9 },
+    { "frameKiB": 256, "highMiB": 4, "MBs": 18.3 },
+    { "frameKiB": 256, "highMiB": 16, "MBs": 17.1 }
+  ],
+  "conclusion": "The browser's SCTP DataChannel itself tops out around 15-23 MB/s on this machine with zero application work. 64 KiB messages with a 4-16 MiB send buffer are the best combination; the app default is 64 KiB / 8 MiB. This, not SwiftDrop's code, is the ~11-17 MB/s ceiling users see."
+}

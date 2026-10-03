@@ -30,7 +30,7 @@ export interface Transport {
   create(req: CreateTransfer): Promise<CreateResult>;
   status(transferId: string): Promise<TransferStatus>;
   putBlocks(transferId: string, fileId: string, startBlock: number, body: Uint8Array<ArrayBuffer>, hashes: string, signal: AbortSignal): Promise<{ load: number }>;
-  putBatch(transferId: string, body: Blob, signal: AbortSignal): Promise<{ load: number }>;
+  putBatch(transferId: string, body: Uint8Array<ArrayBuffer>, signal: AbortSignal): Promise<{ load: number }>;
   complete(transferId: string, fileId: string, root: string): Promise<{ finalName: string }>;
   cancel(transferId: string): Promise<void>;
   ping(signal?: AbortSignal): Promise<void>;
@@ -75,8 +75,9 @@ export class HttpTransport implements Transport {
     return { load: readLoad(res) };
   }
 
-  async putBatch(transferId: string, body: Blob, signal: AbortSignal) {
-    const res = await this.request("POST", `/api/transfers/${transferId}/batch`, body, {
+  async putBatch(transferId: string, body: Uint8Array<ArrayBuffer>, signal: AbortSignal) {
+    // Blob for the same reason as putBlocks: Chromium's fast upload path.
+    const res = await this.request("POST", `/api/transfers/${transferId}/batch`, new Blob([body]), {
       headers: { "content-type": "application/octet-stream" },
       signal,
     });

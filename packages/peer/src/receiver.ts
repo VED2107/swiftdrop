@@ -25,7 +25,11 @@ type Manifest = z.output<typeof CreateTransferSchema>;
 
 /** Where one file's bytes go. Positional writes; may be called concurrently for different ranges. */
 export interface FileSink {
-  write(position: number, bytes: Uint8Array): Promise<void>;
+  /**
+   * `owned`: the caller is done with `bytes` and its whole buffer, so a sink that hands
+   * data to a worker may transfer the buffer instead of copying it.
+   */
+  write(position: number, bytes: Uint8Array, owned?: boolean): Promise<void>;
   /** Flush and release; the file must be readable afterwards. */
   close(): Promise<void>;
 }
@@ -38,6 +42,12 @@ export interface SinkFactory {
   remove(transferId: string): Promise<void>;
   /** The finished file, disk-backed where the platform allows. */
   file(transferId: string, fileId: string, name: string, type: string): Promise<File>;
+  /**
+   * Optional fast path for batch frames: write many whole small files that all live in
+   * `frame` (each at `offset`, `size` bytes) in one go. Sinks without it get open/write/close
+   * per file. `frame` is owned by the sink afterwards.
+   */
+  writeFiles?(transferId: string, frame: Uint8Array, files: Array<{ fileId: string; offset: number; size: number }>): Promise<void>;
 }
 
 /** Resume state survives page reloads when a store is given. */
@@ -313,7 +323,8 @@ export class PeerReceiver {
     const actual = hasher.hashBlocks(body, BLOCK_SIZE);
     if (!equal(actual, claimed)) throw new ProtocolError("INTEGRITY");
     try {
-      await (await this.sink(t, f)).write(from, body);
+      // The reassembly buffer is ours alone and unused after this: let the sink keep it.
+      await (await this.sink(t, f)).write(from, body, body.byteOffset === 0 && body.byteLength === body.buffer.byteLength);
     } catch (err) {
       throw storageError(err);
     }
@@ -329,8 +340,9 @@ export class PeerReceiver {
   private async writeBatch(t: ReceivedTransfer, frame: Uint8Array) {
     const { header, payload } = decodeBatch(frame);
     const hasher = await this.hasher(t.integrity);
-    const work: Array<{ f: ReceivedFile; data: Uint8Array }> = [];
+    const work: Array<{ f: ReceivedFile; data: Uint8Array; offset: number }> = [];
     let offset = 0;
+    const base = payload.byteOffset;
     for (const e of header.files) {
       const f = t.byId.get(e.id);
       const data = payload.subarray(offset, offset + e.size);
@@ -339,13 +351,24 @@ export class PeerReceiver {
       if (f.size !== e.size) throw new ProtocolError("BAD_REQUEST", "size mismatch");
       if (f.state === "complete" || f.state === "skipped") continue;
       if (bytesToBase64Url(hasher.hashBlocks(data, BLOCK_SIZE)) !== e.hash) throw new ProtocolError("INTEGRITY");
-      work.push({ f, data });
+      work.push({ f, data, offset: base + offset - e.size });
     }
     try {
-      for (const { f, data } of work) {
-        const sink = await this.sink(t, f);
-        if (data.length) await sink.write(0, data);
-        await this.closeSink(t, f);
+      const sinks = this.opts.sinks;
+      if (sinks.writeFiles && work.length) {
+        // One hand-off for the whole frame instead of open/write/close per file.
+        for (const { f } of work) await this.closeSink(t, f);
+        await sinks.writeFiles(
+          t.id,
+          new Uint8Array(frame.buffer, 0, frame.buffer.byteLength),
+          work.map(({ f, offset: o }) => ({ fileId: f.id, offset: o, size: f.size })),
+        );
+      } else {
+        for (const { f, data } of work) {
+          const sink = await this.sink(t, f);
+          if (data.length) await sink.write(0, data);
+          await this.closeSink(t, f);
+        }
       }
     } catch (err) {
       throw storageError(err);
@@ -579,6 +602,12 @@ export class MemorySinkFactory implements SinkFactory {
       async close() {},
     };
   }
+  async writeFiles(transferId: string, frame: Uint8Array, files: Array<{ fileId: string; offset: number; size: number }>) {
+    this.batchWrites++;
+    for (const f of files) this.files.set(`${transferId}/${f.fileId}`, frame.slice(f.offset, f.offset + f.size));
+  }
+  /** writeFiles calls: tests check batch frames take the one-hand-off path */
+  batchWrites = 0;
   async discard(transferId: string, fileId: string) {
     this.files.delete(`${transferId}/${fileId}`);
   }

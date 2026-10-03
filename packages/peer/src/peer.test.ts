@@ -86,7 +86,7 @@ describe("phone -> phone over a DataChannel", () => {
     let hit = false;
     const { sender } = await link(receiver, {
       tamper(frame) {
-        if (!hit && frame[0] === 2 && frame.byteLength > 1000) {
+        if (!hit && frame.byteLength > 1000) {
           hit = true;
           const copy = frame.slice();
           copy[500] = copy[500]! ^ 0xff;
@@ -172,6 +172,53 @@ describe("phone -> phone over a DataChannel", () => {
     expect(Buffer.compare(Buffer.from(await got.arrayBuffer()), Buffer.from(data))).toBe(0);
   });
 
+  it("packs 1,000 small files into a few batch frames, each stored in one hand-off", async () => {
+    const { receiver, sinks } = setup();
+    const { sender } = await link(receiver, { rate: 2000 });
+    const files = Array.from({ length: 1000 }, (_, i) => source(`p/${i}.txt`, bytes(10_000, 100 + i), "notes"));
+    const j = job(new PeerTransport(sender), files);
+    await j.start();
+    await j.done;
+    expect(j.snapshot().state).toBe("complete");
+    // 10 MB in ≤ 8 MiB frames: a handful of requests, not 1,000
+    expect(j.telemetry().requests).toBeLessThan(20);
+    expect(sinks.batchWrites).toBe(j.telemetry().requests);
+    const got = await sinks.file(j.id, files[637]!.id, "x", "");
+    expect(Buffer.compare(Buffer.from(await got.arrayBuffer()), Buffer.from(bytes(10_000, 737)))).toBe(0);
+  });
+
+  it("aborts a request mid-body without desynchronising the channel, then resumes", async () => {
+    const { receiver } = setup();
+    const { sender } = await link(receiver, { rate: 15 });
+    const data = bytes(12 * BLOCK_SIZE, 11);
+    const f = source("pause.mov", data);
+    const j = job(new PeerTransport(sender), [f]);
+    await j.start();
+    while (j.snapshot().bytesDone < 2 * BLOCK_SIZE) await new Promise((r) => setTimeout(r, 5));
+    j.pause(); // aborts in-flight requests, some of them mid-body
+    await new Promise((r) => setTimeout(r, 300));
+    j.resume();
+    await j.done;
+    expect(j.snapshot().state).toBe("complete");
+    expect(j.snapshot().chunkFailures).toBe(0);
+    const t = receiver.get(j.id)!;
+    const got = await receiver.file(t, t.byId.get(f.id)!);
+    expect(Buffer.compare(Buffer.from(await got.arrayBuffer()), Buffer.from(data))).toBe(0);
+  });
+
+  it("sends file bytes as raw binary messages: no per-frame header, no JSON, no base64", async () => {
+    const { receiver } = setup();
+    const frames: Uint8Array[] = [];
+    const { sender } = await link(receiver, { tamper: (fr) => (frames.push(fr), fr) });
+    const data = bytes(2 * BLOCK_SIZE + 5, 13);
+    const j = job(new PeerTransport(sender), [source("raw.bin", data)]);
+    await j.start();
+    await j.done;
+    const total = frames.reduce((s, fr) => s + fr.byteLength, 0);
+    expect(total).toBe(data.byteLength);
+    expect(Buffer.compare(Buffer.from(frames[0]!), Buffer.from(data.subarray(0, frames[0]!.byteLength)))).toBe(0);
+  });
+
   it("refuses PC-direction manifests", async () => {
     const { receiver } = setup();
     const { sender } = await link(receiver);
@@ -185,9 +232,9 @@ describe("phone -> phone over a DataChannel", () => {
 describe("signaling payload", () => {
   it("round-trips compressed and fits a QR", async () => {
     const sdp = `v=0\r\no=- 46117317 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=group:BUNDLE 0\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\nc=IN IP4 0.0.0.0\r\na=candidate:1 1 udp 2122260223 192.168.1.23 54321 typ host generation 0\r\na=candidate:2 1 udp 2122260223 fd00::1 54322 typ host generation 0\r\na=ice-ufrag:abcd\r\na=ice-pwd:0123456789abcdefghijklmn\r\na=fingerprint:sha-256 ${"AB:".repeat(31)}AB\r\na=setup:actpass\r\na=mid:0\r\na=sctp-port:5000\r\na=max-message-size:262144\r\n`;
-    const enc = await encodeSignal({ v: 1, type: "offer", sdp, sid: "0123456789abcdef01", name: "Ved's iPhone" });
+    const enc = await encodeSignal({ v: 2, type: "offer", sdp, sid: "0123456789abcdef01", name: "Ved's iPhone" });
     expect(enc.length).toBeLessThan(900);
-    expect((await decodeSignal(`https://drop.example/p2p.html#o=${enc}`)).sdp).toBe(sdp);
+    expect((await decodeSignal(`https://drop.example/p2p.html#o=${enc}&k=AAAAAAAAAAAAAAAAAAAAAA`)).sdp).toBe(sdp);
     expect(extractSignal("hello")).toBeNull();
     await expect(decodeSignal("Dnot-valid")).rejects.toThrow();
   });

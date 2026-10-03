@@ -576,6 +576,16 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
     "base-uri 'none'",
     "form-action 'self'",
   ].join("; ");
+  // p2p.html pairs phones through a rendezvous mailbox (SDP only, sealed): allow exactly that
+  // origin, the one the build was pointed at (ntfy.sh unless VITE_SIGNAL_URL says otherwise).
+  const signalOrigin = (() => {
+    try {
+      return new URL(process.env.VITE_SIGNAL_URL || "https://ntfy.sh").origin;
+    } catch {
+      return "https://ntfy.sh";
+    }
+  })();
+  const P2P_CSP = CSP.replace("connect-src 'self' ws: wss:", `connect-src 'self' ${signalOrigin}`);
 
   async function serveStatic(req: IncomingMessage, res: ServerResponse, pathname: string) {
     if (req.method !== "GET" && req.method !== "HEAD") throw new ProtocolError("NOT_FOUND");
@@ -596,7 +606,7 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
       "content-type": MIME[extname(file)] ?? "application/octet-stream",
       "content-length": String(st.size),
       "cache-control": immutable ? "public, max-age=31536000, immutable" : "no-cache",
-      "content-security-policy": CSP,
+      "content-security-policy": file.endsWith(`${sep}p2p.html`) ? P2P_CSP : CSP,
       "x-frame-options": "DENY",
     });
     if (req.method === "HEAD") return void res.end();

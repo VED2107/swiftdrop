@@ -11,7 +11,7 @@ export interface MemoryLinkOptions {
   rate?: number;
   /** throw from send() above this many buffered bytes (Chrome closes the channel) */
   sendQueueLimit?: number;
-  /** tamper with a frame in flight; return the bytes to deliver */
+  /** tamper with a binary frame in flight; return the bytes to deliver */
   tamper?: (frame: Uint8Array) => Uint8Array;
 }
 
@@ -24,7 +24,7 @@ class MemoryChannel implements ChannelLike {
   binaryType = "arraybuffer";
   peer!: MemoryChannel;
   private readonly listeners = new Map<string, Array<(ev: { data: unknown }) => void>>();
-  private queue: Uint8Array[] = [];
+  private queue: Array<Uint8Array | string> = [];
   private draining = false;
 
   constructor(private readonly opts: MemoryLinkOptions) {}
@@ -39,12 +39,15 @@ class MemoryChannel implements ChannelLike {
     for (const fn of this.listeners.get(type) ?? []) fn({ data });
   }
 
-  send(data: ArrayBuffer | ArrayBufferView<ArrayBuffer>) {
+  send(data: string | ArrayBuffer | ArrayBufferView<ArrayBuffer>) {
     if (this.readyState !== "open") throw new Error("InvalidStateError");
-    const bytes = data instanceof ArrayBuffer ? new Uint8Array(data.slice(0)) : new Uint8Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
-    if (this.bufferedAmount + bytes.byteLength > (this.opts.sendQueueLimit ?? 16 << 20)) throw new Error("OperationError: send queue is full");
-    this.bufferedAmount += bytes.byteLength;
-    this.queue.push(bytes);
+    // Copied like the real thing: the caller may reuse its buffer right after send().
+    const item =
+      typeof data === "string" ? data : data instanceof ArrayBuffer ? new Uint8Array(data.slice(0)) : new Uint8Array(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+    const size = typeof item === "string" ? item.length : item.byteLength;
+    if (this.bufferedAmount + size > (this.opts.sendQueueLimit ?? 16 << 20)) throw new Error("OperationError: send queue is full");
+    this.bufferedAmount += size;
+    this.queue.push(item);
     if (!this.draining) this.drain();
   }
 
@@ -59,12 +62,17 @@ class MemoryChannel implements ChannelLike {
       let budget = rate * 2;
       while (this.queue.length && budget > 0) {
         const f = this.queue.shift()!;
-        budget -= f.byteLength;
+        const size = typeof f === "string" ? f.length : f.byteLength;
+        budget -= size;
         const before = this.bufferedAmount;
-        this.bufferedAmount -= f.byteLength;
-        const out = this.opts.tamper ? this.opts.tamper(f) : f;
-        const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
-        queueMicrotask(() => this.peer.readyState === "open" && this.peer.emit("message", buf));
+        this.bufferedAmount -= size;
+        let msg: string | ArrayBuffer;
+        if (typeof f === "string") msg = f;
+        else {
+          const out = this.opts.tamper ? this.opts.tamper(f) : f;
+          msg = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer;
+        }
+        queueMicrotask(() => this.peer.readyState === "open" && this.peer.emit("message", msg));
         if (before > this.bufferedAmountLowThreshold && this.bufferedAmount <= this.bufferedAmountLowThreshold) this.emit("bufferedamountlow");
       }
       if (this.queue.length) setTimeout(step, 2);

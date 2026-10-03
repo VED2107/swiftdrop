@@ -1,9 +1,13 @@
-import { DataChannelTransport, type FramingOptions } from "./channel.ts";
-import { decodeSignal, encodeSignal, type SignalPayload } from "./signal.ts";
+import { DataChannelTransport, DEFAULT_FRAME, type FramingOptions } from "./channel.ts";
+import { decodeSignal, encodeSignal, SIGNAL_VERSION, type SignalPayload } from "./signal.ts";
 
 /**
  * One phone-to-phone connection. Signaling is whatever carries the two strings this class
- * produces and consumes (a QR today); it only ever holds SDP and ICE — never file data.
+ * produces and consumes (the pairing QR one way, a rendezvous mailbox or a reply QR the
+ * other); it only ever holds SDP and ICE, never file data.
+ *
+ * Roles are independent of direction: the phone showing the QR makes the offer, the one
+ * scanning answers. The DataChannel is symmetric once open.
  *
  * Non-trickle ICE: we wait for candidate gathering to finish so one offer and one answer
  * are the entire exchange. No STUN/TURN servers are configured, so only local candidates
@@ -38,7 +42,7 @@ export class PeerSession {
     this.pc.addEventListener("datachannel", (ev) => this.adopt(ev.channel));
   }
 
-  /** Sender side: creates the channel and an offer string to show as a QR. */
+  /** The phone that shows the QR: creates the channel and the offer string. */
   static async offer(opts: PeerSessionOptions): Promise<{ session: PeerSession; offer: string }> {
     const s = new PeerSession(opts, randomId());
     s.adopt(s.pc.createDataChannel("swiftdrop", { ordered: true }));
@@ -47,10 +51,10 @@ export class PeerSession {
     return { session: s, offer: await s.localSignal() };
   }
 
-  /** Receiver side: takes the scanned offer, returns the answer string to show back. */
+  /** The phone that scanned: takes the offer, returns the answer string. */
   static async answer(offer: string, opts: PeerSessionOptions): Promise<{ session: PeerSession; answer: string }> {
     const remote = await decodeSignal(offer);
-    if (remote.type !== "offer") throw new Error("That code isn't a SwiftDrop offer.");
+    if (remote.type !== "offer") throw new Error("That code isn't a SwiftDrop pairing code.");
     const s = new PeerSession(opts, remote.sid);
     s.remoteName = remote.name;
     await s.pc.setRemoteDescription({ type: "offer", sdp: remote.sdp });
@@ -59,7 +63,7 @@ export class PeerSession {
     return { session: s, answer: await s.localSignal() };
   }
 
-  /** Sender side: completes the handshake with the scanned answer. */
+  /** The offering phone: completes the handshake with the answer. */
   async accept(answer: string): Promise<void> {
     const remote = await decodeSignal(answer);
     if (remote.type !== "answer") throw new Error("That code isn't a SwiftDrop reply.");
@@ -73,7 +77,7 @@ export class PeerSession {
     const ch = await this.channelReady;
     // Never exceed what the other end accepts; 64 KiB unless a benchmark knob says otherwise.
     const peerMax = this.pc.sctp?.maxMessageSize || Infinity;
-    const wanted = this.opts.framing?.maxMessageSize ?? 64 * 1024;
+    const wanted = this.opts.framing?.maxMessageSize ?? DEFAULT_FRAME;
     const t = new DataChannelTransport(ch, { ...this.opts.framing, maxMessageSize: Math.min(peerMax, wanted) });
     await t.connect();
     return t;
@@ -110,7 +114,7 @@ export class PeerSession {
   private localSignal(): Promise<string> {
     const d = this.pc.localDescription;
     if (!d) throw new Error("no local description");
-    const payload: SignalPayload = { v: 1, type: d.type as "offer" | "answer", sdp: d.sdp, sid: this.sessionId, name: this.opts.name.slice(0, 40) };
+    const payload: SignalPayload = { v: SIGNAL_VERSION, type: d.type as "offer" | "answer", sdp: d.sdp, sid: this.sessionId, name: this.opts.name.slice(0, 40) };
     return encodeSignal(payload);
   }
 }

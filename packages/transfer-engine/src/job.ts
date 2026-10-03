@@ -86,6 +86,8 @@ export interface JobSnapshot {
   health: Health;
   lastDecision: ControllerReason | null;
   elapsedSeconds: number;
+  /** index into `files` of the file being sent now */
+  currentFile: number;
 }
 
 interface Flight {
@@ -101,7 +103,7 @@ interface Flight {
 /** A request body read and hashed ahead of its send. */
 type Prepared =
   | { kind: "blocks"; body: Uint8Array<ArrayBuffer>; hashes: string }
-  | { kind: "batch"; frame: Blob };
+  | { kind: "batch"; frame: Uint8Array<ArrayBuffer> };
 
 interface HashStore {
   digests: Uint8Array;
@@ -149,6 +151,12 @@ export class TransferJob {
   private readonly latencies = new Reservoir(512);
   private requests = 0;
   private prepareMs = 0;
+  private startedAt = 0;
+  private firstSendAt = 0;
+  private firstAckAt = 0;
+  private firstFileAt = 0;
+  /** Index of the file the newest request carries: what the UI names as "sending now". */
+  private current = 0;
   private wireBytes = 0;
   private inflightBytes = 0;
   private peakInflightBytes = 0;
@@ -214,6 +222,7 @@ export class TransferJob {
     this.setState("preparing");
     try {
       const t0 = this.now();
+      this.startedAt = t0;
       this.hasher = await createBlockHasher(this.opts.integrity ?? "xxh64");
       const status = await this.negotiate();
       this.prepareMs = this.now() - t0;
@@ -306,6 +315,7 @@ export class TransferJob {
       health: this.health(speed),
       lastDecision: this.lastDecision,
       elapsedSeconds: this.meter.activeSeconds,
+      currentFile: this.current,
     };
   }
 
@@ -320,6 +330,9 @@ export class TransferJob {
     return {
       stages: { ...this.stages },
       prepareMs: this.prepareMs,
+      startToFirstSendMs: this.firstSendAt ? this.firstSendAt - this.startedAt : null,
+      startToFirstAckMs: this.firstAckAt ? this.firstAckAt - this.startedAt : null,
+      startToFirstFileMs: this.firstFileAt ? this.firstFileAt - this.startedAt : null,
       requests: this.requests,
       payloadBytes: this.bytesDone,
       wireBytes: this.wireBytes,
@@ -460,6 +473,10 @@ export class TransferJob {
       st.hashMs += this.now() - t2;
       return { kind: "blocks", body, hashes };
     }
+    // Small files are read in parallel (a Blob concatenating hundreds of disk-backed Files
+    // reads them one after another: measured 1.1 MB/s vs. parallel reads in Chromium), then
+    // copied once into one contiguous frame. One contiguous body matters: a Blob of hundreds
+    // of small parts uploads ~2x slower (tests/performance/body-shapes.ts).
     let t = this.now();
     const buffers = await Promise.all(item.files.map((f) => this.files[f.index]!.blob.arrayBuffer()));
     let t2 = this.now();
@@ -472,18 +489,16 @@ export class TransferJob {
     t = this.now();
     st.hashMs += t - t2;
     const header = encodeBatchHeader({ files: entries });
-    // One contiguous part: a Blob of hundreds of small parts uploads ~2x slower (measured,
-    // tests/performance/body-shapes.ts) and costs the receiver 5x longer to pull off the socket.
-    const flat = new Uint8Array(header.byteLength + item.bytes);
-    flat.set(header, 0);
+    const frame = new Uint8Array(header.byteLength + item.bytes);
+    frame.set(header, 0);
     let at = header.byteLength;
     for (const b of buffers) {
-      flat.set(new Uint8Array(b), at);
+      if (at + b.byteLength > frame.byteLength) throw new TransportError("BAD_FRAME", 0, "a file changed size while it was being read");
+      frame.set(new Uint8Array(b), at);
       at += b.byteLength;
     }
-    t2 = this.now();
-    st.frameMs += t2 - t;
-    return { kind: "batch", frame: new Blob([flat]) };
+    st.frameMs += this.now() - t;
+    return { kind: "batch", frame };
   }
 
   private async execute(flight: Flight, ready: Promise<Prepared> | null): Promise<void> {
@@ -498,6 +513,8 @@ export class TransferJob {
     const p = await (ready ?? this.prepare(item));
     if (flight.ac.signal.aborted) throw new TransportError("CANCELLED");
     const t = this.now();
+    if (!this.firstSendAt) this.firstSendAt = t;
+    this.current = item.kind === "blocks" ? item.file.index : item.files[0]!.index;
     if (p.kind === "blocks") {
       const { load } = await this.transport.putBlocks(this.id, (item as Extract<WorkItem, { kind: "blocks" }>).file.id, (item as Extract<WorkItem, { kind: "blocks" }>).start, p.body, p.hashes, flight.ac.signal);
       const t2 = this.now();
@@ -511,14 +528,16 @@ export class TransferJob {
     const { load } = await this.transport.putBatch(this.id, p.frame, flight.ac.signal);
     const t2 = this.now();
     st.networkMs += t2 - t;
-    this.wireBytes += p.frame.size;
+    this.wireBytes += p.frame.byteLength;
     this.recordSuccess(batch.bytes, t2 - t, load);
     this.planner.ack(item);
+    if (!this.firstFileAt) this.firstFileAt = t2;
     this.filesDone += batch.files.length;
     this.fileMeter.add(batch.files.length);
   }
 
   private recordSuccess(bytes: number, latency: number, load: number) {
+    if (!this.firstAckAt) this.firstAckAt = this.now();
     this.bytesDone += bytes;
     this.meter.add(bytes);
     this.sampleBytes += bytes;
@@ -565,6 +584,7 @@ export class TransferJob {
       const { finalName } = await this.transport.complete(this.id, f.id, hasher.root(store.digests));
       f.finalName = finalName;
       this.planner.ack(item);
+      if (!this.firstFileAt) this.firstFileAt = this.now();
       this.filesDone++;
       this.fileMeter.add(1);
       this.hashes.delete(f.index);

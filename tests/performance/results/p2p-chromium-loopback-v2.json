@@ -1,0 +1,49 @@
+{
+  "at": "2026-10-03T20:05:15.186Z",
+  "sizeMb": 256,
+  "harness": "two contexts, one headless Chromium, loopback, OPFS receiver",
+  "rows": [
+    {
+      "hwKiB": 1024,
+      "frameKiB": 64,
+      "MBs": 12.9,
+      "acceptToFirstSend": "14 ms"
+    },
+    {
+      "hwKiB": 4096,
+      "frameKiB": 64,
+      "MBs": 12.7,
+      "acceptToFirstSend": "6 ms"
+    },
+    {
+      "hwKiB": 8192,
+      "frameKiB": 64,
+      "MBs": 12.4,
+      "acceptToFirstSend": "4 ms"
+    },
+    {
+      "hwKiB": 16384,
+      "frameKiB": 64,
+      "MBs": 12.3,
+      "acceptToFirstSend": "5 ms"
+    },
+    {
+      "hwKiB": 8192,
+      "frameKiB": 16,
+      "MBs": 11.8,
+      "acceptToFirstSend": "4 ms"
+    },
+    {
+      "hwKiB": 8192,
+      "frameKiB": 256,
+      "MBs": 12.9,
+      "acceptToFirstSend": "6 ms"
+    }
+  ],
+  "small": {
+    "files": 1000,
+    "fileKB": 10,
+    "seconds": 3.61,
+    "filesPerSec": 277
+  }
+}

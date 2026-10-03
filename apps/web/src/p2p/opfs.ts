@@ -3,11 +3,15 @@ import type { FileSink, SinkFactory, StateStore } from "@swiftdrop/peer";
 /**
  * Received files live in the Origin Private File System: disk-backed, written at their
  * offset as chunks arrive, never gathered in memory. Layout:
- *   swiftdrop/<transferId>/<fileId>     data
- *   swiftdrop/state/<transferId>.json   resume state
+ *   swiftdrop/<transferId>/<fileId>       data of a large file
+ *   swiftdrop/<transferId>/pack           small files from batch frames, back to back
+ *   swiftdrop/<transferId>/pack.index     "<fileId>	<offset>	<size>" per small file
+ *   swiftdrop/state/<transferId>.json     resume state
  */
 
 const ROOT = "swiftdrop";
+const NL = String.fromCharCode(10);
+const TAB = String.fromCharCode(9);
 
 export function opfsAvailable(): boolean {
   return typeof navigator !== "undefined" && typeof navigator.storage?.getDirectory === "function" && isSecureContext;
@@ -22,6 +26,8 @@ export class OpfsSinkFactory implements SinkFactory {
   private readonly workerReady: Promise<boolean>;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
+  /** For the debug panel: bytes handed to storage and time until the worker confirmed them. */
+  readonly stats = { bytes: 0, writes: 0, busyMs: 0 };
 
   constructor() {
     this.workerReady = new Promise<boolean>((resolve) => {
@@ -67,15 +73,32 @@ export class OpfsSinkFactory implements SinkFactory {
     if (await this.workerReady) {
       await this.post({ op: "open", path, size });
       return {
-        write: (at, bytes) => {
-          // A transferable copy: the receiver's reassembly buffer isn't ours to give away.
-          const buf = bytes.slice().buffer;
-          return this.post({ op: "write", path, at, bytes: buf }, [buf]);
+        write: (at, bytes, owned) => {
+          // Owned buffers move to the worker; anything else is copied first so the
+          // caller's memory is never detached under it.
+          const len = bytes.byteLength;
+          const buf = owned ? (bytes.buffer as ArrayBuffer) : bytes.slice().buffer;
+          return this.timed(len, this.post({ op: "write", path, at, bytes: buf, off: owned ? bytes.byteOffset : 0, len }, [buf]));
         },
         close: () => this.post({ op: "close", path }),
       };
     }
     return writableSink(path, size);
+  }
+
+  /** A whole batch frame in one message: the worker appends every file in it to the pack. */
+  async writeFiles(transferId: string, frame: Uint8Array, files: Array<{ fileId: string; offset: number; size: number }>) {
+    this.packs.delete(transferId);
+    if (!(await this.workerReady)) {
+      for (const f of files) {
+        const sink = await writableSink([ROOT, transferId, f.fileId], f.size);
+        if (f.size) await sink.write(0, frame.subarray(f.offset, f.offset + f.size));
+        await sink.close();
+      }
+      return;
+    }
+    const buf = frame.buffer as ArrayBuffer;
+    await this.timed(files.reduce((n, f) => n + f.size, 0), this.post({ op: "files", dir: [ROOT, transferId], bytes: buf, files: files.map((f) => ({ name: f.fileId, off: frame.byteOffset + f.offset, len: f.size })) }, [buf]));
   }
 
   async discard(transferId: string, fileId: string) {
@@ -84,15 +107,53 @@ export class OpfsSinkFactory implements SinkFactory {
   }
 
   async remove(transferId: string) {
+    this.packs.delete(transferId);
     const d = await dir([ROOT]).catch(() => null);
     await d?.removeEntry(transferId, { recursive: true }).catch(() => undefined);
   }
 
   async file(transferId: string, fileId: string, name: string, type: string): Promise<File> {
     const d = await dir([ROOT, transferId]);
+    const packed = (await this.packIndex(transferId, d)).get(fileId);
+    if (packed) {
+      // A slice of the disk-backed pack: still nothing read into memory.
+      const pack = await (await d.getFileHandle("pack")).getFile();
+      return new File([pack.slice(packed.off, packed.off + packed.len)], name, { type: type || "application/octet-stream", lastModified: pack.lastModified });
+    }
     const f = await (await d.getFileHandle(fileId)).getFile();
     // A File built from a disk-backed File references it; nothing is read into memory here.
     return new File([f], name, { type: type || "application/octet-stream", lastModified: f.lastModified });
+  }
+
+  private readonly packs = new Map<string, Promise<Map<string, { off: number; len: number }>>>();
+
+  private packIndex(transferId: string, d: FileSystemDirectoryHandle) {
+    let p = this.packs.get(transferId);
+    if (!p) {
+      p = (async () => {
+        const out = new Map<string, { off: number; len: number }>();
+        const text = await d
+          .getFileHandle("pack.index")
+          .then((h) => h.getFile())
+          .then((f) => f.text())
+          .catch(() => "");
+        for (const line of text.split(NL)) {
+          const [id, off, len] = line.split(TAB);
+          if (id && off !== undefined && len !== undefined) out.set(id, { off: Number(off), len: Number(len) });
+        }
+        return out;
+      })();
+      this.packs.set(transferId, p);
+    }
+    return p;
+  }
+
+  private async timed(bytes: number, p: Promise<void>): Promise<void> {
+    const t0 = performance.now();
+    await p;
+    this.stats.busyMs += performance.now() - t0;
+    this.stats.bytes += bytes;
+    this.stats.writes++;
   }
 
   private post(msg: Record<string, unknown>, transfer: Transferable[] = []): Promise<void> {

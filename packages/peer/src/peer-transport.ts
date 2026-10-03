@@ -48,9 +48,8 @@ export class PeerTransport implements Transport {
     return this.call<{ load: number }>("blocks", { transferId, fileId, start: startBlock, hashes }, body, signal);
   }
 
-  async putBatch(transferId: string, body: Blob, signal: AbortSignal) {
-    const bytes = new Uint8Array(await body.arrayBuffer());
-    return this.call<{ load: number }>("batch", { transferId }, bytes, signal);
+  async putBatch(transferId: string, body: Uint8Array<ArrayBuffer>, signal: AbortSignal) {
+    return this.call<{ load: number }>("batch", { transferId }, body, signal);
   }
 
   complete(transferId: string, fileId: string, root: string) {
@@ -75,6 +74,9 @@ export class PeerTransport implements Transport {
     const result = new Promise<T>((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
     });
+    // It can settle (abort, timeout, link drop) while the body is still queued behind
+    // another; the await below picks the outcome up then.
+    result.catch(() => undefined);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const onAbort = () => {
       void link.sendControl({ t: "abort", id }).catch(() => undefined);
@@ -83,11 +85,10 @@ export class PeerTransport implements Transport {
     signal?.addEventListener("abort", onAbort, { once: true });
     if (timeoutMs) timer = setTimeout(() => this.settle(id, new TransportError("NETWORK", 0, `${op} timed out`)), timeoutMs);
     try {
-      const req: ControlMessage = { t: "req", id, op, args };
-      if (body) req.len = body.byteLength;
-      if (op === "create") await link.sendManifest(id, args as CreateTransfer);
+      const req: Extract<ControlMessage, { t: "req" }> = { t: "req", id, op, args };
+      if (body && body.byteLength) await link.sendRequest(req, body, signal);
+      else if (op === "create") await link.sendManifest(id, args as CreateTransfer);
       else await link.sendControl(req);
-      if (body && body.byteLength) await link.sendChunk(id, 0, body);
     } catch {
       this.settle(id, new TransportError("NETWORK", 0, "link closed while sending"));
     }

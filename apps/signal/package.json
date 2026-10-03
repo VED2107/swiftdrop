@@ -1,0 +1,12 @@
+{
+  "name": "@swiftdrop/signal",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/main.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2"
+  }
+}

@@ -14,6 +14,9 @@ importers:
       '@swiftdrop/crypto':
         specifier: workspace:*
         version: link:packages/crypto
+      '@swiftdrop/peer':
+        specifier: workspace:*
+        version: link:packages/peer
       '@swiftdrop/protocol':
         specifier: workspace:*
         version: link:packages/protocol
@@ -93,6 +96,12 @@ importers:
       postject:
         specifier: 1.0.0-alpha.6
         version: 1.0.0-alpha.6
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.15
+
+  apps/signal:
+    devDependencies:
       tsx:
         specifier: ^4.19.2
         version: 4.23.15

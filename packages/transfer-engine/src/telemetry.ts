@@ -24,6 +24,12 @@ export interface Telemetry {
   stages: StageTimes;
   /** start() -> first byte may move: manifest negotiation (and conflict checks on the receiver) */
   prepareMs: number;
+  /** start() -> first request body handed to the transport (includes the receiver's Accept) */
+  startToFirstSendMs: number | null;
+  /** start() -> first body acknowledged by the receiver */
+  startToFirstAckMs: number | null;
+  /** start() -> first whole file confirmed */
+  startToFirstFileMs: number | null;
   requests: number;
   /** payload bytes acknowledged by the receiver */
   payloadBytes: number;

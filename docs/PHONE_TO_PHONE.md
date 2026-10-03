@@ -1,132 +1,141 @@
-# Phone ↔ Phone (direct, no PC)
+# Phone ↔ Phone (web, direct, no PC)
 
-Status: **core implemented, not yet verified on real iPhones.** Automated tests cover the protocol (in-memory channel) and a real WebRTC DataChannel transfer between two Chromium pages. Everything marked **verify on device** below is an iOS behavior this repo cannot measure without two phones.
+Status (2026-10-04): one-QR pairing, wire format v2, bidirectional sessions and the app-style UI are implemented and covered by unit, integration and two-browser WebRTC tests. **Not yet measured on real phones**: every number below is from Chromium on one Windows machine and is labelled as such. Real-device runs (iPhone ↔ iPhone, iPhone ↔ Android, phone ↔ desktop browser) are still owed.
 
-Requirement: phone A sends files directly to phone B. The PC may be switched off. No byte of file data touches the PC, a cloud relay, Vercel, or a signaling server.
+Requirement: phone A sends files directly to phone B. No byte of file data touches a PC, a cloud relay, Vercel, the rendezvous mailbox, or any server.
 
 ```
-                 SIGNALING ONLY (SDP + ICE, ~1 KB, no file data)
-          ┌──────────── QR on screen, scanned by the other phone ───────────┐
-          │                                                                 │
-      📱 phone A ════════════════ WebRTC DataChannel ════════════════ 📱 phone B
-                 DATA PLANE: manifest, chunks, hashes, acks, resume state
+           SIGNALING ONLY (sealed SDP, ~1 KB per message, never file data)
+     ┌── QR on the sender's screen ──┐        ┌── rendezvous mailbox (ntfy protocol) ──┐
+     │   offer + 128-bit secret      │        │   AES-GCM ciphertext, random topics    │
+     ▼                               │        ▼                                        │
+ 📱 sender ═════════════════ WebRTC DataChannel (DTLS) ═════════════════ 📱 receiver
+           DATA PLANE: manifest, file bytes, digests, acks, resume state — both directions
 ```
 
-## 1. Current transfer engine, as it relates to transport
+## 1. Flow
 
-`packages/transfer-engine` is transport-agnostic already. `TransferJob` owns everything that matters for speed and correctness and only talks to this interface (`transport.ts`):
+1. **Sender** taps Send. The file picker opens; while it is up, the WebRTC offer is built (ICE gathered).
+2. Files picked → the QR appears at once: `https://<host>/p2p.html#o=<offer>&k=<secret>`.
+3. **Receiver** taps Receive and scans it, or points the iPhone Camera at it (Safari opens the link and the page acts as the receiver). Nobody scans back.
+4. The receiver's answer is sealed with a key derived from the secret and posted to the mailbox; the sender, listening, completes the handshake. DataChannel opens.
+5. Receiver sees "iPhone wants to send 3 files" → Accept. The sender's first 1 MiB request goes out immediately (measured 4–14 ms after the accept reaches the sender).
+6. The connection stays up as a session: **either phone can send** (Send more, Send files back, Select files on the connected screen), including both directions at once.
 
-| `Transport` method | What the engine uses it for |
+No internet (hotspot without uplink, or `?signal=off`): the mailbox is unreachable, so the receiver shows a reply QR and the sender taps **Scan reply**: one extra scan, everything else identical. The sender only offers that path when the mailbox failed.
+
+Drop: the phone that showed the QR re-dials through the mailbox every 8 s (fresh offer to the `guest` box, answer back in the `host` box); the new channel is attached to the same transfer, which asks the receiver for its bitmaps and sends only what's missing. Manual fallback: "Show a new code" / "Scan again".
+
+### Why a mailbox, and what it can see
+
+A browser cannot open a socket to another phone, and WebRTC needs both DTLS fingerprints and ICE credentials to cross in both directions; one QR carries only one direction. So the answer needs a path back. Options were a second QR (the old flow), or a relay for ~1 KB of SDP. The mailbox is that relay:
+
+- Protocol: the publish/subscribe subset of [ntfy](https://ntfy.sh): `POST /<topic>` and `GET /<topic>/json?since=…`. Default `https://ntfy.sh` (CORS-enabled, no account); override with `VITE_SIGNAL_URL`; self-host with `apps/signal` (`pnpm --filter @swiftdrop/signal start`, ~150 lines, in memory, 4 KiB body cap, 10 min TTL, 16 messages per topic).
+- Topics and key are derived from the QR's 128-bit secret (SHA-256 with distinct labels). The server sees two random topic names and `1.<base64url(iv ‖ AES-GCM ciphertext)>`; not SDP, not IPs, not device names. A message sealed with another secret fails to decrypt and is dropped; a replayed answer doesn't match the live session id.
+- It cannot carry files: messages are signaling objects (`{kind: offer|answer, signal}`), bodies are capped, and the data path is the DataChannel. No STUN/TURN is configured, so ICE can only pick local candidates.
+- CSP allows exactly the configured mailbox origin (`apps/web/vercel.json`, and the PC server for `p2p.html`).
+
+## 2. Audit of the previous implementation (v1)
+
+| Question | Finding |
 |---|---|
-| `create(manifest)` | send the manifest once; receive per-file state + resume bitmaps (or conflicts) |
-| `status(id)` | after any drop: adopt the receiver's bitmap, resend only what's missing |
-| `putBlocks(id, file, start, body, hashes)` | 1–16 contiguous 1 MiB blocks + per-block digests; returns a load hint |
-| `putBatch(id, frame)` | many small files in one `[u32 len][JSON header][bytes]` frame |
-| `complete(id, file, root)` | per-file root digest; mismatch ⇒ receiver discards the file, engine restarts it |
-| `cancel(id)`, `ping()` | cancel, reachability probe used by the reconnect loop |
+| Why did iPhone selection feel slow? | Mostly the iOS picker itself: the photo picker exports/transcodes assets before `change` fires, and the JS can't see or shorten that. On top of it v1 built **thumbnails** (`URL.createObjectURL` + `<img>` decode of every image ≤ 30 MB) in the selection grid, and the flow made you pick → tap "Show code" → wait for ICE → scan → scan back before any byte moved. |
+| Where were files copied? | Sender: `blob.slice().arrayBuffer()` (needed), then **a new frame + copy per 64 KiB** for the 9-byte header. Batches: per-file `arrayBuffer()` → copy into a frame → wrapped in a `Blob` → `PeerTransport` called `blob.arrayBuffer()` **again**. Receiver: copy into reassembly buffer (needed), then **`bytes.slice()`** before posting to the OPFS worker. |
+| Where was hashing? | Per 1 MiB block, streaming, while sending (xxh64, wasm, GB/s). Never a whole-file pre-hash. Not a bottleneck (debug panel: 1.3–2.2 GB/s). |
+| Did the manifest block? | The manifest is metadata only (names, sizes); building it is microseconds. It waits for Accept by design. |
+| Where did WebRTC stall? | 1 MiB send buffer with a 256 KiB low mark; raw measurements show a deeper buffer helps (§4). |
+| Storage limits? | Small files: **open + write + close per file, each awaited as a separate worker round trip** (3 messages per file). Measured 1.4 ms per 10 KB file just for OPFS handle creation. |
+| Why ~11–17 MB/s? | That is the browser's DataChannel itself. With **no SwiftDrop code at all**, two separate Chromium processes blasting frames reach 15–23 MB/s on this machine (§4). v1 reached ~85% of the single-process ceiling. |
+| Receiver-only / one-QR possible without breaking signaling? | Yes: signaling was already transport-agnostic (`PeerSession.offer/answer/accept` take strings). Only the return path for the answer was new (the mailbox). |
 
-Engine-side pieces reused unchanged: `Planner` (block claims/acks, batching, resume), `AdaptiveController` (concurrency + chunk size under a memory budget), per-block hashing and file roots, the reconnect loop (`ping` → `status` → adopt bitmap → continue), `SpeedMeter`, telemetry, `TransferQueue`.
+## 3. Pipelines
 
-Today's only implementation is `HttpTransport` (phone → PC server). The receiving logic lives in the Node server (`apps/server/src/store.ts`).
-
-## 2. WebRTC transport boundary
-
-Three layers, each replaceable:
-
+**v1**
 ```
-TransferJob (unchanged)
-   │  Transport interface (unchanged)
-   ▼
-PeerTransport ─────────── RPC over a PhoneTransport: req/res JSON + binary body frames
-   │  PhoneTransport interface
-   ▼
-WebRTCDataChannelTransport ── one ordered, reliable RTCDataChannel; framing; bufferedAmount backpressure
+tap Send → picker (iOS export/transcode) → thumbnails decode → "Show code" → ICE gather → QR
+→ receiver scans → reply QR → sender scans → DataChannel → manifest → Accept
+→ read 1 MiB → hash → per-64 KiB frame alloc+copy → send (1 MiB buffer)
+→ receiver: copy into body → hash → slice() copy → worker → write (per small file: 3 round trips)
 ```
 
-```ts
-interface PhoneTransport {
-  connect(): Promise<void>;                          // resolves when the channel is open
-  sendControl(msg: ControlMessage): Promise<void>;   // small JSON (manifest, acks, status, errors)
-  sendChunk(reqId: number, offset: number, bytes: Uint8Array): Promise<void>; // file bytes, awaits backpressure
-  sendManifest(reqId: number, manifest: CreateTransfer): Promise<void>;     // a control message, named for clarity
-  close(): Promise<void>;
-  getBufferedAmount(): number;
-  onControl / onChunk / onClose                      // receive side
-}
+**v2 (now)**
+```
+tap Send → picker opens; offer + ICE gathered in parallel
+→ picked: File references only (no read, no thumbnail, no hash) → QR on screen
+→ receiver scans → sealed answer via mailbox → DataChannel warm
+→ manifest (metadata) → Accept → first 1 MiB request starts at once (4–14 ms)
+→ read 1–4 MiB slice → hash blocks → send views of the buffer (no copy), 8 MiB send buffer,
+  bodies serialized, next request read+hashed while this one is on the wire (bounded 32 MiB)
+→ receiver: copy into body → verify digests → transfer buffer to the OPFS worker (no copy)
+  → positional write; small files: whole batch frame → one append to a pack file
+→ per-file root digest check on completion; bitmaps persisted for resume
 ```
 
-- **Wire frames** (every DataChannel message is binary): `0x01 + UTF-8 JSON` for control; `0x02 + u32 reqId + u32 offset + bytes` for data. A request's control message declares its body length; body frames follow on the same ordered channel.
-- **Frame size**: `min(pc.sctp.maxMessageSize, 64 KiB)` — large DataChannel messages block the SCTP stream and older Safari/Chrome combinations reject > 64 KiB.
-- **Backpressure**: `sendChunk` waits while `bufferedAmount > high` (1 MiB default) for `bufferedamountlow` (`bufferedAmountLowThreshold`, 256 KiB). Never queues unboundedly; Chrome closes a channel whose send queue overflows.
-- **One channel** first, as required. Parallel "streams" from the controller become pipelined requests on that channel (they keep the pipe full while the receiver hashes and writes). A multi-channel variant is only worth trying after the device benchmark.
-- **`PeerReceiver`** (phone B) answers the same RPCs with the same semantics as the PC server: verify every block digest before marking it received, batch frames, root check on completion, bitmaps for resume. Storage is behind a `SinkFactory` (OPFS on phones, memory in tests).
-- **Explicit acceptance**: `create` for an unknown transfer id waits for the person on phone B to tap Accept (with names, count, size, and a storage-quota check). Decline ⇒ `DECLINED`.
-- **Direction** `to-peer` is added to the protocol enum so a peer manifest can never be mistaken for a PC upload (the PC server rejects it).
+### Data plane v2 (`packages/peer/src/channel.ts`)
 
-Memory is bounded on both sides: the `PEER_CONTROLLER` budget caps bytes in flight (sender reads + receiver reassembly) at 16 MiB; frames are written to storage per request, never accumulated per file.
+- Control: **string** messages (compact JSON). File bytes: **binary** messages carrying nothing but body bytes; the type of the message tells them apart, so data needs no header and goes out as `subarray` views.
+- One body at a time, each right after its own `req`; the receiver attributes binary messages to requests by order. A request aborted mid-body ends with `{t:"abort", id, sent}` in the same ordered stream.
+- Bidirectional: each phone runs a `PeerTransport` (its outgoing requests) and a `PeerReceiver` (the other phone's requests) on the same channel.
+- Backpressure: wait while `bufferedAmount + next > 8 MiB`, resume on `bufferedamountlow` (2 MiB) with a 50 ms timer fallback. Stall count and time are exported (`stats`).
+- Message size: `min(peer max-message-size, 64 KiB)`.
+- Version: signal payload `v: 2`. A v1 page scanning a v2 code (or the reverse) gets "The other phone has a different version of SwiftDrop open. Reload the page on both phones."
 
-## 3. Signaling
+### Controller (`PEER_CONTROLLER`)
 
-Signaling carries only `{type, sdp}` plus a display name and session id — never file data — and is kept out of the transport entirely (`Signaler`-agnostic: the session takes an offer/answer string, however it travelled).
+2→4 pipelined requests, 1→4 MiB per request, 32 MiB in-flight budget (sender reads + receiver reassembly), windowed probing (judged over ≥ 6 completions, never per chunk). The first request is a single 1 MiB block so bytes move at once.
 
-**First mechanism: QR, fully offline.** Non-trickle ICE (wait for gathering to finish; host candidates only, typically < 1 s), SDP deflated with `CompressionStream("deflate-raw")` and base64url-encoded (~500–900 chars → one QR).
+### Receiver storage
 
-1. Phone A (sender) picks files, shows a QR of `https://<app>/p2p.html#o=<offer>`.
-2. Phone B scans it — with the in-app scanner, or with the iOS Camera app, which opens the app straight on the offer. B shows its answer as a QR.
-3. Phone A taps **Scan reply**, scans B's QR. ICE connects; the DataChannel opens.
+- Large files: one OPFS file each, positional `SyncAccessHandle` writes in a dedicated worker; the reassembly buffer is transferred, not copied.
+- Small files (batch frames, ≤ 512 KiB each): appended to `swiftdrop/<transfer>/pack` with an append-only `pack.index`; saving returns disk-backed `File` slices of the pack. Measured 0.4 vs 1.4 ms per 10 KB file.
+- IndexedDB is not used for file data.
 
-Why QR first: no server of any kind, works on a hotspot with no internet, and camera permission has a useful side effect: Safari and Chrome replace host candidates with mDNS `.local` names unless the page holds camera/microphone permission. With the camera granted, the scanning phone's real LAN address is in its SDP, so ICE doesn't depend on mDNS resolution (which some hotspots and routers block).
+## 4. Measurements (Chromium on one Windows PC, loopback; not phones)
 
-**Later, optional:** an HTTPS rendezvous that relays only SDP/ICE (short-lived, in memory, no storage of file data), or the PC's existing WebSocket hub when a PC happens to be on. Both plug in above the transport without changing it.
+Raw DataChannel ceiling, no SwiftDrop code, two separate Chromium processes (`tests/performance/raw-datachannel.ts`, results in `tests/performance/results/raw-datachannel-2proc.json`):
 
-No STUN/TURN servers are configured: the connection is LAN-only by construction. Nothing leaves the local network.
+| message | 1 MiB buffer | 4 MiB | 16 MiB |
+|---|---|---|---|
+| 16 KiB | 14.7 MB/s | 8.3 | 12.3 |
+| 64 KiB | 15.8 | 19.9 | **22.6** |
+| 256 KiB | 15.9 | 18.3 | 17.1 |
 
-## 4. Is it actually direct and local?
+Full app, same harness as the 2026-09-28 baseline (two contexts in **one** Chromium process, so sender and receiver share one network thread), 256 MiB, OPFS receiver (`SD_P2P_BENCH=1 npx playwright test tests/e2e/p2p-bench.spec.ts`; `results/p2p-chromium-loopback-v2.json`):
 
-WebRTC does not guarantee a local path. After connecting, `describePath(pc)` reads `getStats()`: the selected candidate pair, both candidates' types (`host`, `srflx`, `prflx`, `relay`), addresses and protocol. The UI says:
-
-- **Direct · Local network** — only when neither side is `relay` and both addresses are private/link-local (RFC 1918, 100.64/10 CGNAT excluded, fc00::/7, fe80::/10) or mDNS `.local` names.
-- **Direct · P2P** with the network path shown — not relayed, but the addresses don't prove same-LAN.
-- **Relayed** — a TURN relay is in use (not configured today; shown for completeness).
-
-## 5. iPhone receiving and storage constraints
-
-Facts SwiftDrop relies on, with what to check on real devices:
-
-| Topic | Constraint | Design response |
+| | v1 (2026-09-28) | v2 |
 |---|---|---|
-| Secure context | OPFS, camera (`getUserMedia`), Wake Lock, `crypto.subtle`, service workers all need HTTPS (or localhost). The PC serves plain `http://192.168.x.x`, so the P2P page can't run from the PC. | `p2p.html` is a standalone static page built separately (`pnpm --filter @swiftdrop/web build:p2p`) and served over HTTPS (Vercel or any static host). It never calls the PC. |
-| DataChannel | Supported in iOS Safari 11+. Throughput in Safari is modest (~20–60 MB/s on desktop; **verify on device**). | One reliable ordered channel, 64 KiB frames, bounded buffering. Benchmark before adding channels. |
-| Saving files | No `showSaveFilePicker` / File System Access API on iOS. | Receive into the **Origin Private File System** (disk-backed, incremental positional writes, not RAM). Writes go through a dedicated worker with `createSyncAccessHandle()` (Safari 15.2+ / 16.4+ reliable), falling back to `createWritable()`. |
-| Getting files out | Files in OPFS are private to the page. | Per file: **Save** = `navigator.share({ files: [opfsFile] })` (Save to Files / Save Image), or a download of the OPFS-backed `File` via an object URL. The `File` is disk-backed; whether iOS copies it into memory for large videos must be **verified on device**. |
-| Quota | Safari grants roughly up to 60% of disk per origin (iOS 17+); earlier versions prompt at ~1 GB. | `navigator.storage.estimate()` is checked before Accept; `DISK_FULL` otherwise. `navigator.storage.persist()` requested. |
-| Memory | Tabs get killed well before desktop limits. | Never hold a whole file in JS memory; ≤ 16 MiB in flight per side. |
-| Background / lock | Safari suspends JS when backgrounded or locked; the DataChannel dies (ICE times out). | Screen Wake Lock while transferring (iOS 16.4+). A drop is resumable: see below. |
-| mDNS | Host candidates are hidden behind `.local` names without camera permission. | See §3: the scanning phone has camera permission. **Verify on a hotspot.** |
+| 256 MiB single file | 10.4–11.9 MB/s | 12.3–13.3 MB/s |
+| accept → first byte | not measured | 4–14 ms |
+| 1,000 × 10 KB | not measured | 3.5–3.6 s (~280 files/s) |
+| in-flight memory | ≤ 16 MiB + 1 MiB buffer | ≤ 32 MiB + 8 MiB buffer (measured peak 3–6 MiB) |
 
-## 6. Resume and reconnect
+Small-file profile (debug panel): sender file reads ~3 MB/s summed across parallel reads, i.e. ~3 ms per `File.arrayBuffer()` call in this Chromium; storage 13 MB/s while busy after the pack change (5 MB/s before). The per-file read cost is the browser's.
 
-- The receiver persists per-transfer state (manifest, block bitmaps, block digests) as JSON in OPFS next to the `.part` data, debounced 1 s — the same model as the PC server.
-- Channel drop ⇒ every pending RPC rejects with `NETWORK` ⇒ the engine's existing reconnect loop starts pinging. Re-signaling (a fresh QR round, one tap each) produces a new DataChannel; `PeerTransport.attach(newChannel)` makes `ping` succeed; the engine calls `status`, adopts the receiver's bitmap and sends only what's missing. Blocks already received are never resent.
-- Page reload on the receiver: state and partial data survive in OPFS; the same transfer id resumes.
-- Page reload on the sender: the existing resume records (file fingerprints in localStorage) re-attach when the same files are picked again.
-- Duplicates: each transfer lands in its own OPFS folder, so nothing is overwritten; names are sanitized with the same rules as the PC.
+## 5. Browser and iOS limits (what can't be optimized from JS)
 
-## 7. Files and modules
+- **DataChannel throughput** is bounded by the browser's SCTP stack (small ~1.2 KB packets, each DTLS-encrypted, on one network thread). Measured 15–23 MB/s raw in Chromium; Safari's number must come from devices. More channels or peer connections didn't raise it in earlier measurements.
+- **iOS photo picker**: the export/transcode happens before the page gets `File` objects. SwiftDrop's input has **no `accept` filter**, so iOS offers Photo Library / Take Photo / Choose Files in one sheet and (per WebKit's behaviour when HEIC isn't excluded) should hand over originals; **verify on device** whether HEIC and video arrive untranscoded.
+- **No background**: Safari suspends the page when locked or backgrounded; the channel dies. Wake Lock keeps the screen on while connected; drops resume.
+- **Saving**: no folder access on iOS; received files live in OPFS until saved via the share sheet or download. Large-video save-out behaviour: **verify on device**.
+- **Secure context**: OPFS, camera and Wake Lock need https; `p2p.html` is a static page for an https host.
+- **Per-file read cost** (§4) limits tiny-file rate; batching hides the network side, not the read side.
 
-| Path | Change |
+## 6. Debug panel
+
+`?debug=1` shows: connection state, selected candidate pair (type/protocol), RTT, message size; sender channel MB/s, `bufferedAmount` (and peak), stalls, file-read and hash MB/s, streams × chunk and controller decision, ack latency p50/p95, stage times; receiver channel and storage MB/s; in-flight memory; picker → link, accept → first send, first ack, first file done. Never rendered without the flag.
+
+## 7. Files
+
+| Path | Role |
 |---|---|
-| `packages/protocol` | `to-peer` direction; `DECLINED` error code |
-| `packages/peer` (new) | `PhoneTransport` interface, `WebRTCDataChannelTransport`, framing, RPC, `PeerTransport` (engine adapter), `PeerReceiver` + `SinkFactory` + memory sink, signaling codec, `describePath`, `PEER_CONTROLLER` |
-| `apps/web/p2p.html`, `apps/web/src/p2p/*` | standalone P2P page: send/receive, QR show + scan, accept, progress, path badge, save; OPFS sink + worker |
-| `apps/web/vite.config.ts`, `apps/web/package.json` | multi-page build; `build:p2p` output for an HTTPS host |
-| `tests/peer/*` | engine ⇄ receiver over an in-memory channel (bytes, batches, corruption, decline, drop + resume, backpressure) |
-| `tests/e2e/p2p.spec.ts` | two Chromium pages, real WebRTC DataChannel, real OPFS, byte-identical file |
-
-## 8. Implementation order
-
-1. **Core** (this change): protocol, `packages/peer`, in-memory tests, real-WebRTC browser test, minimal `p2p.html` (QR both ways, accept, progress, save).
-2. HTTPS hosting of `p2p.html` + offline service worker (so the app opens on a hotspot with no internet after the first visit).
-3. Real-device verification on two iPhones (and iPhone ↔ Android): throughput, mDNS/hotspot, OPFS limits, save-out of large videos, lock/background recovery. Record results in `PERFORMANCE_AUDIT.md`.
-4. Polished pairing UI and re-pair-to-resume flow.
-5. Optional signaling paths (HTTPS rendezvous, PC hub when present); multi-channel only if the benchmark says one channel is the limit.
+| `packages/peer/src/channel.ts` | wire v2, backpressure, link stats |
+| `packages/peer/src/rendezvous.ts` | sealed mailbox client (ntfy protocol) |
+| `packages/peer/src/signal.ts` | signal codec v2, pair links |
+| `packages/peer/src/receiver.ts` | verification, resume, owned writes, batch fast path |
+| `packages/transfer-engine/src/job.ts` | parallel small-file reads, current file, first-byte timings |
+| `apps/signal` | self-hostable rendezvous (SDP only) |
+| `apps/web/src/p2p/pairing.ts` | host (QR) / guest (scan) pairing, re-dial |
+| `apps/web/src/p2p/P2PApp.tsx`, `p2p.css`, `Debug.tsx`, `history.ts` | app UI, state machine (`data-state` on the root), debug panel, recent transfers |
+| `apps/web/src/p2p/opfs*.ts` | OPFS worker sink, pack file |
+| `tests/e2e/p2p.spec.ts` | one QR via mailbox, in-app scanner + warm second transfer, send-back, offline reply, debug panel |
+| `packages/peer/src/peer.test.ts`, `tests/integration/rendezvous.test.ts` | protocol, abort, batches, bidirectional, mailbox crypto |

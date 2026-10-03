@@ -26,6 +26,8 @@ interface Common {
   framing?: FramingOptions;
   onLinked(l: Linked): void;
   onError?(message: string): void;
+  /** Whether the rendezvous answered (false: offer the reply-QR fallback). */
+  onMailbox?(online: boolean): void;
 }
 
 const POST_TIMEOUT_MS = 5000;
@@ -46,9 +48,13 @@ export class HostPairing {
     this.replace(session);
     if (this.o.signal) {
       this.mailbox ??= Mailbox.create(this.o.signal);
-      this.stopListening ??= this.mailbox.listen("host", (m) => {
-        if (m.kind === "answer") void this.takeAnswer(m.signal).catch(() => undefined);
-      });
+      this.stopListening ??= this.mailbox.listen(
+        "host",
+        (m) => {
+          if (m.kind === "answer") void this.takeAnswer(m.signal).catch(() => undefined);
+        },
+        (online) => this.o.onMailbox?.(online),
+      );
     }
     return pairLink(base(), { offer, key: this.mailbox?.key ?? null });
   }

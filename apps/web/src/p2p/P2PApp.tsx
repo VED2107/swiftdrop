@@ -1,7 +1,7 @@
 import { describePath, pathLabel, PEER_CONTROLLER, PeerReceiver, PeerTransport, type DataChannelTransport, type IncomingOffer, type PathInfo, type PeerSession, type ReceivedTransfer } from "@swiftdrop/peer";
 import { formatBytes, formatCount } from "@swiftdrop/shared";
 import { TransferJob } from "@swiftdrop/transfer-engine";
-import { ArrowDown, ArrowUp, Check, Download, FileText, Film, ImageIcon, LoaderCircle, Plus, RefreshCw, ScanLine, Send, Share, Smartphone, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Download, Files, FileText, Film, ImageIcon, LoaderCircle, Monitor, Plus, RefreshCw, ScanLine, Send, Share, Smartphone, X } from "lucide-react";
 import QRCode from "qrcode";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Connection } from "../components/Connection.tsx";
@@ -64,6 +64,7 @@ const initialCode = /[#&]o=[DP][A-Za-z0-9_-]+/.test(location.hash) ? location.hr
 const initialReply = /[#&]a=([DP][A-Za-z0-9_-]+)/.exec(location.hash)?.[1] ?? null;
 if (initialCode || initialReply) history.replaceState(null, "", location.pathname + location.search);
 
+const selfKind: "phone" | "pc" = isMobile ? "phone" : "pc";
 const thisDevice = deviceLabel() === "This device" ? "This device" : `This ${deviceLabel()}`;
 const plural = (n: number, one: string, many = `${one}s`) => `${formatCount(n)} ${n === 1 ? one : many}`;
 
@@ -79,6 +80,8 @@ export function P2PApp() {
   const [offer, setOffer] = useState<{ offer: IncomingOffer; decide: (ok: boolean) => void } | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
   const [dragging, setDragging] = useState(false);
+  /** null until the rendezvous answers or fails; false shows the reply-QR fallback. */
+  const [mailboxOnline, setMailboxOnline] = useState<boolean | null>(null);
   const [, setTick] = useState(0);
 
   const input = useRef<HTMLInputElement>(null);
@@ -92,6 +95,9 @@ export function P2PApp() {
   const transport = useRef(new PeerTransport());
   const job = useRef<TransferJob | null>(null);
   const redialTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const endSession = useRef<(message?: string) => void>(() => undefined);
+  /** Put away finished incoming transfers (their files stay saved in storage). */
+  const clearReceived = useRef<() => void>(() => undefined);
   /** Wall-clock marks for the debug panel: picker returned, link up, job started. */
   const marks = useRef<{ picked: number; linked: number; jobStart: number }>({ picked: 0, linked: 0, jobStart: 0 });
 
@@ -103,7 +109,19 @@ export function P2PApp() {
         ? new PeerReceiver({
             sinks,
             state: new OpfsStateStore(),
-            accept: (o) => new Promise<boolean>((resolve) => setOffer({ offer: o, decide: (ok) => (setOffer(null), resolve(ok ? enoughSpace(o, setError) : Promise.resolve(false))) })),
+            accept: (o) =>
+              new Promise<boolean>((resolve) =>
+                setOffer({
+                  offer: o,
+                  decide: (ok) => {
+                    setOffer(null);
+                    // A new incoming transfer replaces this phone's own finished send on screen.
+                    if (ok && job.current?.state === "complete") job.current = null;
+                    clearReceived.current();
+                    resolve(ok ? enoughSpace(o, setError) : Promise.resolve(false));
+                  },
+                }),
+              ),
             onComplete: (t) => addHistory(historyOf(t, "received", session.current?.remoteName || "Other phone", elapsed(t.id, true))),
           })
         : null,
@@ -118,16 +136,17 @@ export function P2PApp() {
 
   const fail = useCallback((e: unknown) => setError(plainError(e)), []);
 
+  /** Either direction still moving: once connected, both phones can send. */
   const unfinished = useCallback(() => {
     const j = job.current;
-    if (roleRef.current === "send") return Boolean(j && !["complete", "cancelled", "failed"].includes(j.state));
-    return Boolean(receiver?.list().some((t) => t.filesDone < t.files.length));
+    const sending = Boolean(j && !["complete", "cancelled", "failed"].includes(j.state));
+    return sending || Boolean(receiver?.list().some((t) => t.filesDone < t.files.length));
   }, [receiver]);
 
   const startJob = useCallback(() => {
     const files = pickedRef.current;
     if (!files.length) return;
-    const j = new TransferJob({ transport: transport.current, files: toSources(files), direction: "to-peer", label: describe(files), controller: PEER_CONTROLLER });
+    const j = new TransferJob({ transport: transport.current, files: toSources(files), direction: "to-peer", label: labelFor(files), controller: PEER_CONTROLLER });
     job.current = j;
     marks.current.jobStart = performance.now();
     j.onChange((x) => {
@@ -151,35 +170,39 @@ export function P2PApp() {
       setPhase("linked");
       if (redialTimer.current) clearInterval(redialTimer.current);
       redialTimer.current = null;
-      const lost = () => {
-        if (session.current !== s || !unfinished()) return;
+      const lost = (closed: boolean) => {
+        if (session.current !== s) return;
+        if (!unfinished()) {
+          // Nothing in flight: a closed link just ends the session.
+          if (closed) endSession.current("The other phone disconnected.");
+          return;
+        }
         setPhase("lost");
-        // The sender re-dials through the mailbox until the receiver answers.
-        if (roleRef.current === "send" && host.current && !redialTimer.current) {
+        // The phone that showed the QR re-dials through the mailbox until the other answers.
+        if (host.current && !redialTimer.current) {
           const h = host.current;
           void h.redial();
           redialTimer.current = setInterval(() => void h.redial(), 8000);
         }
       };
-      l.onClose(lost);
+      l.onClose(() => lost(true));
       // The channel only reports "closed" once ICE gives up, which can take half a minute.
       s.pc.addEventListener("connectionstatechange", () => {
         const st = s.pc.connectionState;
-        if (st === "disconnected" || st === "failed") lost();
+        if (st === "disconnected" || st === "failed") lost(st === "failed");
         else if (st === "connected" && session.current === s) setPhase((p) => (p === "lost" ? "linked" : p));
       });
       void refreshPath(s, setPath);
-      if (roleRef.current === "send") {
-        transport.current.attach(l);
-        if (!job.current) startJob();
-      } else {
-        receiver!.attach(l);
-      }
+      // Both directions on one channel: requests this phone sends get responses through the
+      // transport, requests the other phone sends are served by the receiver.
+      transport.current.attach(l);
+      receiver?.attach(l);
+      if (!job.current && pickedRef.current.length) startJob();
     },
     [receiver, startJob, unfinished],
   );
 
-  const pairingOpts = useMemo(() => ({ name, signal: signalUrl, framing, onLinked }), [name, onLinked]);
+  const pairingOpts = useMemo(() => ({ name, signal: signalUrl, framing, onLinked, onMailbox: setMailboxOnline }), [name, onLinked]);
 
   // ---- sender ------------------------------------------------------------------
   /** Tap Send: the picker opens and, while it's up, the offer is built (ICE gathered). */
@@ -202,8 +225,10 @@ export function P2PApp() {
       const next = finished ? dedupe(p) : dedupe([...pickedRef.current, ...p]);
       pickedRef.current = next;
       setPicked(next);
-      // Already connected ("Send more", or files picked after pairing): start right now.
+      // Already connected ("Send more", "Send files back", or picked after pairing): start now,
+      // and put away whatever finished screen was showing.
       if (link.current?.isOpen && (!job.current || finished)) {
+        clearReceived.current();
         job.current = null;
         startJob();
       }
@@ -251,6 +276,19 @@ export function P2PApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A code link opened in a tab that already shows the app only changes the hash.
+  useEffect(() => {
+    const on = () => {
+      if (!/[#&]o=[DP][A-Za-z0-9_-]+/.test(location.hash) || roleRef.current === "send" || link.current?.isOpen) return;
+      const href = location.href;
+      history.replaceState(null, "", location.pathname + location.search);
+      setRole("receive");
+      void scanned(href);
+    };
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, [scanned]);
+
   useWakeLock(phase === "linked" || phase === "lost");
 
   /** Back to the start. Received files stay in storage until saved. */
@@ -276,10 +314,18 @@ export function P2PApp() {
     setRole(null);
     setPhase("home");
   }, []);
+  clearReceived.current = () => {
+    const done = receiver?.list().filter((t) => t.filesDone === t.files.length) ?? [];
+    if (done.length) setDismissed((d) => new Set([...d, ...done.map((t) => t.id)]));
+  };
+  endSession.current = (message?: string) => {
+    reset();
+    if (message) setError(message);
+  };
 
   /** Lost for good: show a fresh code (sender) or scan again (receiver). Progress is kept. */
   const repair = useCallback(() => {
-    if (roleRef.current === "send" && host.current) {
+    if (host.current) {
       setHostLink(null);
       setPhase("host");
       host.current.start().then(setHostLink, fail);
@@ -304,7 +350,8 @@ export function P2PApp() {
       e.preventDefault();
       depth = 0;
       setDragging(false);
-      if (!e.dataTransfer || roleRef.current === "receive") return;
+      // Connected: either side can send. Not connected: only the start screen begins a send.
+      if (!e.dataTransfer || (roleRef.current === "receive" && !link.current?.isOpen)) return;
       const dt = e.dataTransfer;
       void fromDataTransfer(dt).then((p) => {
         if (!p.length) return;
@@ -337,7 +384,8 @@ export function P2PApp() {
   const j = job.current;
   const snap = j?.snapshot() ?? null;
   const incoming = receiver?.list().filter((t) => !dismissed.has(t.id)).sort((a, b) => b.createdAt - a.createdAt)[0] ?? null;
-  const peer = peerName || (role === "send" ? "the receiver" : "the sender");
+  // Two browsers often report the same generic name ("Windows PC"): tell them apart.
+  const peer = peerName ? (peerName === name ? `the other ${peerName}` : peerName) : role === "send" ? "the receiver" : "the sender";
   const flow = flowState({ phase, role, picked: picked.length, snap, incoming, offer: Boolean(offer) });
 
   let screen: { key: string; body: ReactNode };
@@ -346,8 +394,42 @@ export function P2PApp() {
   } else if (phase === "lost") {
     const pct = role === "send" ? (snap ? pctOf(snap.bytesDone, snap.bytesTotal) : 0) : incoming ? pctOf(incoming.bytesDone, incoming.bytesTotal) : 0;
     screen = { key: "lost", body: <Interrupted pct={pct} role={role} peer={peer} auto={Boolean(signalUrl)} onRepair={repair} /> };
-  } else if (phase === "linked" && role === "send" && j && snap) {
-    if (snap.state === "complete")
+  } else if (phase === "linked") {
+    // Connected: either phone can send. What's moving comes first, then what just finished.
+    const sending = Boolean(j && snap && snap.state !== "complete" && snap.state !== "cancelled");
+    const receiving = Boolean(incoming && incoming.filesDone < incoming.files.length);
+    const sendCard =
+      j && snap && sending ? (
+        <TransferCard
+          key="send"
+          testId="send-progress"
+          state={snap.state}
+          verb={verbFor(flowOf("send", snap, null), peer)}
+          fileName={j.files[snap.currentFile]?.name ?? j.label}
+          bytesDone={snap.bytesDone}
+          bytesTotal={snap.bytesTotal}
+          speed={snap.speed}
+          average={snap.average}
+          eta={snap.state === "running" && snap.bytesDone > 0 ? snap.etaSeconds : null}
+          filesLeft={snap.filesTotal - snap.filesDone - snap.filesSkipped}
+          message={snap.state === "failed" ? plainError(snap.message ?? "The transfer stopped.") : null}
+          onCancel={() => void j.cancel().then(() => (job.current = null))}
+          live={snap.state === "running"}
+        />
+      ) : null;
+    const recvCard = incoming && receiving ? <ReceiveCard key="recv" t={incoming} receiver={receiver!} peer={peer} flow={flowOf("receive", null, incoming)} /> : null;
+    if (sendCard || recvCard) {
+      screen = { key: `moving-${sendCard ? "s" : ""}${recvCard ? "r" : ""}`, body: <div className="p2p-stack">{sendCard}{recvCard}</div> };
+    } else if (incoming && incoming.filesDone === incoming.files.length) {
+      screen = {
+        key: `rdone-${incoming.id}`,
+        body: (
+          <Complete sent={false} files={incoming.files.length} bytes={incoming.bytesTotal} peer={peer} seconds={elapsed(incoming.id, true)}>
+            <Saved t={incoming} receiver={receiver!} onDone={() => setDismissed((d) => new Set(d).add(incoming.id))} onSendBack={() => input.current?.click()} />
+          </Complete>
+        ),
+      };
+    } else if (j && snap?.state === "complete") {
       screen = {
         key: `done-${j.id}`,
         body: (
@@ -356,58 +438,23 @@ export function P2PApp() {
               <button className="btn btn-primary btn-lg" onClick={() => input.current?.click()}>
                 <Plus size={20} strokeWidth={1.75} /> Send more
               </button>
-              <button className="btn btn-glass btn-lg" onClick={reset}>
+              <button className="btn btn-glass btn-lg" onClick={() => ((job.current = null), setTick((n) => n + 1))}>
                 Done
               </button>
             </div>
           </Complete>
         ),
       };
-    else {
-      const file = j.files[snap.currentFile];
-      screen = {
-        key: "send",
-        body: (
-          <TransferCard
-            testId="send-progress"
-            state={snap.state}
-            verb={verbFor(flow, peer, "send")}
-            fileName={file?.name ?? j.label}
-            bytesDone={snap.bytesDone}
-            bytesTotal={snap.bytesTotal}
-            speed={snap.speed}
-            average={snap.average}
-            eta={flow === "AWAITING_ACCEPT" || flow === "PREPARING_FIRST_FILE" ? null : snap.etaSeconds}
-            filesLeft={snap.filesTotal - snap.filesDone - snap.filesSkipped}
-            path={path}
-            message={snap.state === "failed" ? plainError(snap.message ?? "The transfer stopped.") : null}
-            onCancel={() => void j.cancel().then(() => (job.current = null))}
-            live={snap.state === "running"}
-          />
-        ),
-      };
+    } else {
+      screen = { key: "linked", body: <Linked peer={peer} path={path} onPick={() => input.current?.click()} onLeave={reset} /> };
     }
-  } else if (phase === "linked" && role === "receive" && incoming) {
-    const done = incoming.filesDone === incoming.files.length;
-    screen = done
-      ? {
-          key: `rdone-${incoming.id}`,
-          body: (
-            <Complete sent={false} files={incoming.files.length} bytes={incoming.bytesTotal} peer={peer} seconds={elapsed(incoming.id, true)}>
-              <Saved t={incoming} receiver={receiver!} onDone={() => setDismissed((d) => new Set(d).add(incoming.id))} />
-            </Complete>
-          ),
-        }
-      : { key: "receive", body: <ReceiveCard t={incoming} receiver={receiver!} peer={peer} path={path} flow={flow} /> };
-  } else if (phase === "linked") {
-    screen = { key: "linked", body: <Linked role={role} peer={peer} path={path} onPick={() => input.current?.click()} onLeave={reset} /> };
   } else if (phase === "connecting") {
     screen = { key: "connecting", body: <Connecting role={role} /> };
   } else if (phase === "host") {
     screen = {
       key: picked.length ? "host" : "selecting",
       body: picked.length ? (
-        <ShowCode link={hostLink} picked={picked} onAdd={() => input.current?.click()} onClear={() => ((pickedRef.current = []), setPicked([]))} onScanReply={() => setPhase("host-scan")} onCancel={reset} offline={!signalUrl} />
+        <ShowCode link={hostLink} picked={picked} onAdd={() => input.current?.click()} onClear={() => ((pickedRef.current = []), setPicked([]))} onScanReply={() => setPhase("host-scan")} onCancel={reset} offline={!signalUrl || mailboxOnline === false} />
       ) : (
         <Selecting onPick={() => input.current?.click()} onCancel={reset} />
       ),
@@ -475,7 +522,14 @@ export function P2PApp() {
           )}
           <Swap k={screen.key}>{screen.body}</Swap>
         </main>
-        <aside className="p2p-aside" aria-label="Recent transfers">
+        <aside className="p2p-aside" aria-label="This device and recent transfers">
+          <section className="p2p-device">
+            <span className="p2p-glyph">{isMobile ? <Smartphone size={17} strokeWidth={1.5} /> : <Monitor size={17} strokeWidth={1.5} />}</span>
+            <span className="min-w-0">
+              <span className="p2p-row-t truncate">{name}</span>
+              <span className="p2p-row-s">This device{peerName && phase === "linked" ? ` · connected to ${peer}` : ""}</span>
+            </span>
+          </section>
           <Recent />
         </aside>
       </div>
@@ -523,7 +577,7 @@ function Home({ canReceive, onSend, onReceive }: { canReceive: boolean; onSend: 
     <section className="p2p-home" aria-label="Start">
       <div className="p2p-hero">
         <div className="p2p-bloom" aria-hidden />
-        <Connection state="waiting" left={{ name: thisDevice, kind: "phone", live: true }} right={{ name: "Other phone", kind: "phone", live: false }} />
+        <Connection state="waiting" left={{ name: thisDevice, kind: selfKind, live: true }} right={{ name: "Other phone", kind: "phone", live: false }} />
       </div>
       <h1 className="p2p-display">
         Send anything.
@@ -583,7 +637,7 @@ function ShowCode({ link, picked, onAdd, onClear, onScanReply, onCancel, offline
       <div className="p2p-glass p2p-selection">
         <FileGlyph name={picked[0]!.file.name} type={picked[0]!.file.type} />
         <span className="min-w-0">
-          <span className="p2p-row-t truncate">{describe(picked)}</span>
+          <span className="p2p-row-t p2p-clamp">{labelFor(picked)}</span>
           <span className="p2p-row-s num">
             {plural(picked.length, "file")} · {formatBytes(total)}
           </span>
@@ -596,13 +650,16 @@ function ShowCode({ link, picked, onAdd, onClear, onScanReply, onCancel, offline
         </button>
       </div>
       <div className="p2p-actions">
-        <button className="btn btn-ghost btn-lg" onClick={onCancel}>
+        <button className="btn btn-glass btn-lg" onClick={onCancel}>
           Cancel
         </button>
-        <button className="btn btn-glass btn-lg" onClick={onScanReply}>
-          <ScanLine size={18} strokeWidth={1.75} /> {offline ? "Scan reply" : "No internet? Scan reply"}
-        </button>
+        {offline && (
+          <button className="btn btn-glass btn-lg" onClick={onScanReply}>
+            <ScanLine size={18} strokeWidth={1.75} /> Scan reply
+          </button>
+        )}
       </div>
+      {offline && <p className="p2p-note text-center">No internet here, so the receiver will show a reply code for this phone to scan.</p>}
     </section>
   );
 }
@@ -625,36 +682,33 @@ function Panel({ title, lead, children, onBack, backLabel }: { title: string; le
 function Connecting({ role }: { role: "send" | "receive" | null }) {
   return (
     <section className="p2p-stack p2p-center" aria-label="Connecting">
-      <Connection state="connecting" left={{ name: thisDevice, kind: "phone", live: true }} right={{ name: "Other phone", kind: "phone", live: false }} flow={role === "receive" ? "left" : "right"} />
+      <Connection state="connecting" left={{ name: thisDevice, kind: selfKind, live: true }} right={{ name: "Other phone", kind: "phone", live: false }} flow={role === "receive" ? "left" : "right"} />
       <h1 className="p2p-h1">Connecting</h1>
       <p className="p2p-lead">Setting up a direct link between the two phones.</p>
     </section>
   );
 }
 
-function Linked({ role, peer, path, onPick, onLeave }: { role: "send" | "receive" | null; peer: string; path: PathInfo | null; onPick: () => void; onLeave: () => void }) {
+function Linked({ peer, path, onPick, onLeave }: { peer: string; path: PathInfo | null; onPick: () => void; onLeave: () => void }) {
   return (
     <section className="p2p-stack p2p-center" aria-label="Connected">
       <div className="p2p-hero p2p-hero-sm">
         <div className="p2p-bloom" aria-hidden />
-        <Connection state="connected" left={{ name: thisDevice, kind: "phone", live: true }} right={{ name: cap(peer), kind: "phone", live: true }} flow={role === "receive" ? "left" : "right"} />
+        <Connection state="connected" left={{ name: thisDevice, kind: selfKind, live: true }} right={{ name: cap(peer), kind: /PC|Mac/.test(peer) ? "pc" : "phone", live: true }} />
       </div>
       <div className="p2p-stack-tight items-center">
-        <p className="p2p-kicker-free">Connected to</p>
-        <h1 className="p2p-h1">{cap(peer)}</h1>
+        <h1 className="p2p-h1">Connected to {cap(peer)}</h1>
         <PathBadge path={path} />
       </div>
-      {role === "send" ? (
-        <div className="p2p-glass p2p-ready">
-          <p className="p2p-row-t">Ready to send</p>
-          <p className="p2p-row-s">{isMobile ? "Pick files to start the transfer." : "Pick files, or drop them anywhere on this window."}</p>
-          <button className="btn btn-primary btn-lg w-full" onClick={onPick}>
-            Select files
-          </button>
-        </div>
-      ) : (
-        <p className="p2p-lead">Waiting for {peer} to choose files.</p>
-      )}
+      <div className="p2p-glass p2p-ready">
+        <p className="p2p-row-t">Ready to send</p>
+        <p className="p2p-row-s">
+          {isMobile ? "Either phone can send now. Pick files to start." : "Either side can send now. Pick files, or drop them anywhere on this window."}
+        </p>
+        <button className="btn btn-primary btn-lg w-full" onClick={onPick}>
+          Select files
+        </button>
+      </div>
       <button className="btn btn-ghost btn-sm" onClick={onLeave}>
         Disconnect
       </button>
@@ -715,7 +769,6 @@ function TransferCard(p: {
   average: number;
   eta: number | null;
   filesLeft: number;
-  path: PathInfo | null;
   message: string | null;
   live: boolean;
   onCancel?: () => void;
@@ -724,11 +777,11 @@ function TransferCard(p: {
   return (
     <section className="p2p-transfer" data-testid={p.testId} data-state={p.state} aria-label="Transfer in progress">
       <div className="p2p-transfer-head">
+        <h1 className="p2p-file truncate">{p.fileName}</h1>
         <span className="p2p-verb">
           <span className="p2p-dot" data-state={p.live ? "live" : p.message ? "warn" : undefined} />
           {p.verb}
         </span>
-        <h1 className="p2p-file truncate">{p.fileName}</h1>
       </div>
 
       <div className="p2p-glass p2p-meter">
@@ -760,11 +813,10 @@ function TransferCard(p: {
         </div>
         <div className="p2p-meter-foot num">
           <span>{p.filesLeft > 0 ? `${plural(p.filesLeft, "file")} remaining` : "Last file"}</span>
-          <span>{p.average > 0 ? `avg ${fmtRate(p.average / 1e6)} MB/s` : ""}</span>
+          <span>{p.average >= 50_000 ? `avg ${fmtRate(p.average / 1e6)} MB/s` : ""}</span>
         </div>
       </div>
 
-      <PathBadge path={p.path} />
       {p.message && (
         <p className="p2p-alert" role="alert">
           {p.message}
@@ -780,7 +832,7 @@ function TransferCard(p: {
   );
 }
 
-function ReceiveCard({ t, receiver, peer, path, flow }: { t: ReceivedTransfer; receiver: PeerReceiver; peer: string; path: PathInfo | null; flow: FlowState }) {
+function ReceiveCard({ t, receiver, peer, flow }: { t: ReceivedTransfer; receiver: PeerReceiver; peer: string; flow: FlowState }) {
   const speed = useRate(t.bytesDone);
   const avg = t.bytesDone / Math.max(0.001, elapsed(t.id, false) || 0.001);
   const current = t.files.find((f) => f.state !== "complete" && f.state !== "skipped") ?? t.files[t.files.length - 1]!;
@@ -794,9 +846,8 @@ function ReceiveCard({ t, receiver, peer, path, flow }: { t: ReceivedTransfer; r
       bytesTotal={t.bytesTotal}
       speed={speed}
       average={elapsed(t.id, false) > 1 ? avg : 0}
-      eta={speed > 0 ? (t.bytesTotal - t.bytesDone) / speed : null}
+      eta={speed > 0 ? (t.bytesTotal - t.bytesDone) / speed : t.bytesDone > 0 ? Infinity : null}
       filesLeft={t.files.length - t.filesDone}
-      path={path}
       message={null}
       live={speed > 0}
       onCancel={() => void receiver.forget(t.id)}
@@ -828,7 +879,7 @@ function Complete({ sent, files, bytes, peer, seconds, children }: { sent: boole
   );
 }
 
-function Saved({ t, receiver, onDone }: { t: ReceivedTransfer; receiver: PeerReceiver; onDone: () => void }) {
+function Saved({ t, receiver, onDone, onSendBack }: { t: ReceivedTransfer; receiver: PeerReceiver; onDone: () => void; onSendBack: () => void }) {
   const [saving, setSaving] = useState(false);
   const saveAll = async () => {
     setSaving(true);
@@ -862,6 +913,9 @@ function Saved({ t, receiver, onDone }: { t: ReceivedTransfer; receiver: PeerRec
         ))}
       </ul>
       <p className="p2p-note">Received files stay in this browser until you save them to Photos or Files.</p>
+      <button className="p2p-textlink" onClick={onSendBack}>
+        <ArrowUp size={15} strokeWidth={1.75} /> Send files back
+      </button>
     </div>
   );
 }
@@ -923,14 +977,14 @@ function Recent() {
 }
 
 function RecentRow({ item }: { item: HistoryItem }) {
-  const Icon = item.kind === "video" ? Film : item.kind === "image" ? ImageIcon : FileText;
+  const Icon = item.kind === "video" ? Film : item.kind === "image" ? ImageIcon : item.kind === "mixed" ? Files : FileText;
   return (
     <li className="p2p-glass p2p-recent-row">
       <span className="p2p-glyph">
         <Icon size={17} strokeWidth={1.5} />
       </span>
       <span className="min-w-0">
-        <span className="p2p-row-t truncate">{item.label}</span>
+        <span className="p2p-row-t p2p-clamp">{item.label}</span>
         <span className="p2p-row-s num truncate">
           {plural(item.files, "file")} · {formatBytes(item.bytes)} · {item.dir === "sent" ? `to ${item.peer}` : `from ${item.peer}`}
         </span>
@@ -1018,26 +1072,33 @@ function flowState(x: { phase: Phase; role: "send" | "receive" | null; picked: n
     case "linked":
       break;
   }
-  if (x.role === "send") {
-    const s = x.snap;
-    if (!s) return "CONNECTED";
-    if (s.state === "queued" || s.state === "preparing") return "AWAITING_ACCEPT";
-    if (s.state === "awaiting-decision") return "AWAITING_ACCEPT";
+  const send = x.snap ? flowOf("send", x.snap, null) : null;
+  const recv = x.incoming ? flowOf("receive", null, x.incoming) : null;
+  const moving = (f: FlowState | null) => f !== null && f !== "COMPLETED" && f !== "CONNECTED";
+  if (moving(send)) return send!;
+  if (moving(recv)) return recv!;
+  if (send === "COMPLETED" || recv === "COMPLETED") return "COMPLETED";
+  return "CONNECTED";
+}
+
+/** One direction's state on a live connection. */
+function flowOf(dir: "send" | "receive", s: ReturnType<TransferJob["snapshot"]> | null, t: ReceivedTransfer | null): FlowState {
+  if (dir === "send") {
+    if (!s || s.state === "cancelled") return "CONNECTED";
+    if (s.state === "queued" || s.state === "preparing" || s.state === "awaiting-decision") return "AWAITING_ACCEPT";
     if (s.state === "running") return s.bytesDone === 0 ? "PREPARING_FIRST_FILE" : s.bytesDone >= s.bytesTotal ? "VERIFYING" : "TRANSFERRING";
     if (s.state === "reconnecting") return "RECONNECTING";
     if (s.state === "paused") return "PAUSED";
     if (s.state === "complete") return "COMPLETED";
-    if (s.state === "failed") return "FAILED";
-    return "CONNECTED";
+    return "FAILED";
   }
-  const t = x.incoming;
   if (!t) return "CONNECTED";
   if (t.filesDone === t.files.length) return "COMPLETED";
   if (t.bytesDone === 0) return "PREPARING_FIRST_FILE";
   return t.bytesDone >= t.bytesTotal ? "VERIFYING" : "TRANSFERRING";
 }
 
-function verbFor(flow: FlowState, peer: string, _dir: "send"): string {
+function verbFor(flow: FlowState, peer: string): string {
   switch (flow) {
     case "AWAITING_ACCEPT":
       return `Waiting for ${peer} to accept`;
@@ -1085,6 +1146,14 @@ function kindSummary(kinds: string[]): HistoryItem["kind"] {
 
 function historyOf(t: ReceivedTransfer, dir: "received", peer: string, seconds: number): HistoryItem {
   return { id: t.id, label: t.label, dir, peer, files: t.files.length, bytes: t.bytesTotal, seconds, at: Date.now(), kind: kindSummary(t.files.map((f) => kindOf(f.name, f.type))) };
+}
+
+/** What a selection is called everywhere (manifest, recents): led by a real file name. */
+function labelFor(picked: Picked[]): string {
+  if (picked.length === 1) return picked[0]!.file.name;
+  const folder = describe(picked);
+  if (!/\d/.test(folder)) return folder; // a folder name
+  return `${picked[0]!.file.name} and ${formatCount(picked.length - 1)} more`;
 }
 
 function dedupe(list: Picked[]): Picked[] {
@@ -1144,7 +1213,9 @@ function useRate(bytes: number): number {
   while (h.length > 2 && now - h[0]![0] > 3000) h.shift();
   if (h.length < 2) return 0;
   const [t0, b0] = h[0]!;
-  return now > t0 ? ((bytes - b0) * 1000) / (now - t0) : 0;
+  // Under 1.5 s of history a rate is a guess (one request landing or not): report none.
+  if (now - t0 < 1500) return 0;
+  return ((bytes - b0) * 1000) / (now - t0);
 }
 
 function useWakeLock(on: boolean) {

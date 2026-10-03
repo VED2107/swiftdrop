@@ -219,6 +219,37 @@ describe("phone -> phone over a DataChannel", () => {
     expect(Buffer.compare(Buffer.from(frames[0]!), Buffer.from(data.subarray(0, frames[0]!.byteLength)))).toBe(0);
   });
 
+  it("carries both directions at once on one channel: each phone sends and receives", async () => {
+    const [ca, cb] = memoryLink();
+    const la = new DataChannelTransport(ca);
+    const lb = new DataChannelTransport(cb);
+    const A = setup();
+    const B = setup();
+    // every phone: a transport for what it sends, a receiver for what it gets
+    const ta = new PeerTransport(la);
+    const tb = new PeerTransport(lb);
+    A.receiver.attach(la);
+    B.receiver.attach(lb);
+    await Promise.all([la.connect(), lb.connect()]);
+    const toB = bytes(5 * BLOCK_SIZE + 3, 21);
+    const toA = bytes(4 * BLOCK_SIZE + 9, 22);
+    const fb = source("a-to-b.mov", toB);
+    const fa = source("b-to-a.mov", toA);
+    const smallB = Array.from({ length: 30 }, (_, i) => source(`s${i}.jpg`, bytes(2000 + i, 40 + i)));
+    const jAB = job(ta, [fb, ...smallB]);
+    const jBA = job(tb, [fa]);
+    await Promise.all([jAB.start(), jBA.start()]);
+    await Promise.all([jAB.done, jBA.done]);
+    expect(jAB.snapshot().state).toBe("complete");
+    expect(jBA.snapshot().state).toBe("complete");
+    const gotB = await B.sinks.file(jAB.id, fb.id, "x", "");
+    const gotA = await A.sinks.file(jBA.id, fa.id, "x", "");
+    expect(Buffer.compare(Buffer.from(await gotB.arrayBuffer()), Buffer.from(toB))).toBe(0);
+    expect(Buffer.compare(Buffer.from(await gotA.arrayBuffer()), Buffer.from(toA))).toBe(0);
+    expect(A.offers).toHaveLength(1);
+    expect(B.offers).toHaveLength(1);
+  });
+
   it("refuses PC-direction manifests", async () => {
     const { receiver } = setup();
     const { sender } = await link(receiver);

@@ -153,32 +153,37 @@ body {
 .p2p:not([data-state="IDLE"]) .p2p-aside {
   display: none;
 }
+/* desktop: one app window, main pane + side pane, like the native desktop app */
 @media (min-width: 960px) {
   .p2p-shell {
-    max-width: 1120px;
+    max-width: 1160px;
+    width: calc(100% - 2 * var(--gutter));
+    min-height: min(720px, calc(100dvh - 120px));
+    margin: var(--s-4) auto var(--s-10);
+    padding: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
-    align-items: start;
-    gap: clamp(32px, 5vw, 72px);
-    padding-top: var(--s-8);
-    padding-inline: var(--gutter);
+    grid-template-columns: minmax(0, 1fr) 360px;
+    align-items: stretch;
+    gap: 0;
+    border-radius: 28px;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.02));
+    box-shadow: var(--glass-edge), 0 40px 120px -40px rgb(0 0 0 / 0.9);
+    -webkit-backdrop-filter: blur(30px) saturate(140%);
+    backdrop-filter: blur(30px) saturate(140%);
   }
   .p2p-main {
-    max-width: 560px;
     width: 100%;
+    max-width: 600px;
     justify-self: center;
+    padding: var(--s-10) var(--s-8) var(--s-12);
   }
   .p2p .p2p-aside,
   .p2p:not([data-state="IDLE"]) .p2p-aside {
     display: block;
-    position: sticky;
-    top: 88px;
-    padding: var(--s-5);
-    border-radius: var(--r-card);
-    background: var(--glass-fill);
-    box-shadow: var(--glass-edge), var(--glass-drop);
-    -webkit-backdrop-filter: blur(24px) saturate(150%);
-    backdrop-filter: blur(24px) saturate(150%);
+    padding: var(--s-8) var(--s-6);
+    background: rgb(0 0 0 / 0.18);
+    box-shadow: inset 1px 0 0 var(--hairline);
   }
 }
 
@@ -237,6 +242,13 @@ body {
   font-weight: 560;
   letter-spacing: -0.012em;
   color: var(--text);
+}
+.p2p-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 .p2p-row-s {
   display: block;
@@ -427,6 +439,7 @@ body {
   letter-spacing: -0.02em;
 }
 .p2p-choice-s {
+  min-height: 2.7em; /* two lines, so both tiles' titles sit on one baseline */
   font-size: 0.8rem;
   line-height: 1.35;
   color: rgb(255 255 255 / 0.7);
@@ -494,6 +507,27 @@ body {
 }
 .p2p-ready .btn {
   margin-top: 12px;
+}
+
+.p2p-textlink {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: color var(--d-micro) ease, background-color var(--d-micro) ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .p2p-textlink:hover {
+    color: var(--text);
+    background: rgb(255 255 255 / 0.05);
+  }
 }
 
 /* ---------------------------------------------------------------- scanner */
@@ -578,6 +612,25 @@ body {
 }
 .p2p .field::placeholder {
   color: var(--text-3);
+  font-family: var(--font-sans);
+}
+.p2p-paste:not(:placeholder-shown) {
+  font-family: var(--font-mono);
+}
+.p2p-device {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-bottom: var(--s-6);
+  padding-bottom: var(--s-5);
+  border-bottom: 1px solid var(--hairline);
+}
+/* phones: the device line is the top bar's job */
+@media (max-width: 959px) {
+  .p2p-device {
+    display: none;
+  }
 }
 
 /* ---------------------------------------------------------------- transfer */

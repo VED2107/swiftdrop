@@ -88,7 +88,7 @@ export function Scanner({ onResult, hint }: { onResult: (text: string) => void; 
           if (manual.trim()) onResult(manual.trim());
         }}
       >
-        <input aria-label="Paste code" className="field mono flex-1 min-w-0" placeholder="Can't scan? Paste the code" autoComplete="off" autoCapitalize="off" spellCheck={false} value={manual} onChange={(e) => setManual(e.target.value)} />
+        <input aria-label="Paste code" className="field p2p-paste flex-1 min-w-0" placeholder="Paste a code" autoComplete="off" autoCapitalize="off" spellCheck={false} value={manual} onChange={(e) => setManual(e.target.value)} />
         <button className="btn btn-secondary" type="submit" disabled={!manual.trim()}>
           Use code
         </button>

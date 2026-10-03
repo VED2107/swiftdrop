@@ -155,6 +155,26 @@ test("in-app scanner, then a second transfer on the same warm connection", async
   expect((await opfsDigests(b))[extra.length]).toBe(sha(extra));
 });
 
+test("after connecting, the receiver sends files back on the same connection", async ({ browser }) => {
+  const { dir, extra } = await fixtures();
+  const { a, b } = await phones(browser);
+  await a.goto(BASE);
+  await send(a, [join(dir, "note.txt")]);
+  await b.goto(await code(a));
+  await b.getByRole("button", { name: "Accept" }).click({ timeout: 20_000 });
+  await expect(live(b, "receive-progress")).toHaveAttribute("data-state", "complete", { timeout: 30_000 });
+
+  // B was the receiver; now it sends. No new code, no scan.
+  const chooser = b.waitForEvent("filechooser");
+  await b.getByRole("button", { name: "Send files back" }).click();
+  await (await chooser).setFiles([join(dir, "second.bin")]);
+  await expect(a.getByRole("dialog", { name: "Incoming files" })).toBeVisible({ timeout: 20_000 });
+  await a.getByRole("button", { name: "Accept" }).click();
+  await expect(live(b, "send-progress")).toHaveAttribute("data-state", "complete", { timeout: 30_000 });
+  await expect(live(a, "receive-progress")).toHaveAttribute("data-state", "complete", { timeout: 30_000 });
+  expect((await opfsDigests(a))[extra.length]).toBe(sha(extra));
+});
+
 test("no internet: pairs with one extra scan (the receiver's reply)", async ({ browser }) => {
   const { dir } = await fixtures();
   const { a, b } = await phones(browser);

@@ -11,7 +11,7 @@ document.documentElement.classList.add("js");
 
 const DOWNLOAD_URL: string = import.meta.env.VITE_DOWNLOAD_URL || "https://github.com/VED2107/swiftdrop/releases/download/v0.3.0/SwiftDrop-Setup-0.3.0.exe";
 // The Android APK ships on the same releases page until it is in a store.
-const ANDROID_URL: string = import.meta.env.VITE_ANDROID_URL || "https://github.com/VED2107/swiftdrop/releases/download/v0.3.0/app-release.apk";
+const ANDROID_URL: string = import.meta.env.VITE_ANDROID_URL || "https://github.com/VED2107/swiftdrop/releases/download/v0.3.0/SwiftDrop-0.3.0.apk";
 const reduced = matchMedia("(prefers-reduced-motion: reduce)");
 
 for (const a of document.querySelectorAll<HTMLAnchorElement>("[data-download]")) a.href = DOWNLOAD_URL;

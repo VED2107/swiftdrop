@@ -34,11 +34,13 @@ Two phones can send to each other directly over WebRTC, with the PC switched off
 
 ## Distribution
 
-SwiftDrop has two deliverables:
+SwiftDrop 1.0.0 has these release deliverables:
 
 | | What | Where |
 |---|---|---|
-| **SwiftDrop.exe** | The app. Local server + web UI in one file; runs on the user's Windows PC. | `pnpm build:exe` → `release/SwiftDrop.exe` (Node single executable, ~90 MB). Publish it on GitHub Releases or any file host. |
+| **SwiftDrop-Setup-1.0.0.exe** | Native Windows installer for the Flutter app. | `flutter build windows --release`, then `pnpm build:installer` → `release/SwiftDrop-Setup-1.0.0.exe`. |
+| **SwiftDrop-1.0.0.apk** | Native Android app. | `flutter build apk --release` → copied to `release/SwiftDrop-1.0.0.apk`. |
+| **SwiftDrop.exe** | Legacy PC server + web UI in one file. | `pnpm build:exe` → `release/SwiftDrop.exe`. |
 | **Landing page** | Marketing + download page (`apps/site`). Static. | Vercel, root directory `apps/site` (config in `apps/site/vercel.json`). |
 
 **Why the app itself can't run on Vercel:** SwiftDrop's server must run on the PC that receives the files — it writes to the local disk, shows the PC's LAN address in the QR code, and phones connect to it over Wi-Fi. A cloud deployment can't reach your disk, would route file bytes through the internet, caps request bodies at ~4.5 MB, and a page served over `https://*.vercel.app` is blocked by browsers from talking to `http://192.168.x.x`. So Vercel serves the landing page — and, as a separate project, the static phone-to-phone page (`p2p.html`), which moves no bytes through Vercel: it only delivers the app code.
@@ -46,15 +48,23 @@ SwiftDrop has two deliverables:
 ### Deploy the landing page on Vercel
 
 1. vercel.com → Add New → Project → import `VED2107/swiftdrop` and pick **`apps/site`** (not `apps/web`: that's the app UI, which only works when served by SwiftDrop on the PC). `apps/site/vercel.json` sets install/build/output. Keep *Include files outside the Root Directory* on (the site reuses the app's design tokens).
-2. Environment variable `VITE_DOWNLOAD_URL` = the **public** URL of `SwiftDrop.exe`. The repo is private, so its release assets are not publicly downloadable: publish the exe somewhere public (a public releases repo, S3/R2, etc.) and point this at it.
+2. Environment variable `VITE_DOWNLOAD_URL` = the **public** URL of `SwiftDrop-Setup-1.0.0.exe`; `VITE_ANDROID_URL` = the public URL of `SwiftDrop-1.0.0.apk`. If the repo is private, publish the release assets somewhere public and point these variables at them.
 3. Deploy.
 
 ### Build the Windows app
 
 ```powershell
 pnpm build:exe          # release/SwiftDrop.exe (icon + version info embedded)
-pnpm build:installer    # also release/SwiftDrop-Setup-<version>.exe
+pnpm build:installer    # release/SwiftDrop-Setup-1.0.0.exe
 pnpm build:icons        # re-render every icon from assets/brand/*.svg
+```
+
+### Build the Android app
+
+```powershell
+cd apps/swiftdrop
+flutter build apk --release
+copy build\app\outputs\flutter-apk\app-release.apk ..\..\release\SwiftDrop-1.0.0.apk
 ```
 
 The installer (Inno Setup, compiler comes from `node_modules`) installs per user with no admin prompt, adds a Start menu entry and optional desktop shortcut, and cleanly uninstalls from *Installed apps*. Choosing **Install for all users** also adds the inbound firewall rule for private networks, so phones connect without Windows asking. Settings, pairings and received files are never removed by the uninstaller.
@@ -76,9 +86,9 @@ Double-click to run: it opens the browser, stores settings in `%USERPROFILE%\.sw
 
 Environment: `SWIFTDROP_PORT` (8787), `SWIFTDROP_DEST`, `SWIFTDROP_MAX_FILE_BYTES`, `SWIFTDROP_LOG` (`debug|info|warn|error`), `SWIFTDROP_NO_OPEN=1`. `SWIFTDROP_E2E=1` is a **test-only** mode (a second browser on the PC acts as the phone) — never use it on a real network.
 
-## Native app (in progress)
+## Native app
 
-A Flutter app for iOS, Android, Windows, macOS and Linux is being built alongside this one in `apps/swiftdrop` (design system and shell so far), with a pure-Dart core in `packages/swiftdrop_core`. The web app and Windows server stay the shipping product until the native app reaches parity. Plan and status: `docs/FLUTTER_MIGRATION.md`; commands: `apps/swiftdrop/README.md`.
+The native Flutter app lives in `apps/swiftdrop`, with shared transfer and pairing logic in `packages/swiftdrop_core`. Android and Windows are the 1.0.0 release targets; iOS, macOS and Linux project files are kept in the tree for ongoing parity work. Commands: `apps/swiftdrop/README.md`.
 
 ## Architecture
 

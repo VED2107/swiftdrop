@@ -21,7 +21,7 @@ const out = join(root, "apps", "swiftdrop", "assets", "web");
 
 const env = { ...process.env };
 delete env.VITE_SIGNAL_URL;
-execFileSync(process.platform === "win32" ? "pnpm.cmd" : "pnpm", ["--filter", "@swiftdrop/web", "build"], { stdio: "inherit", cwd: root, env, shell: process.platform === "win32" });
+execFileSync("corepack", ["pnpm", "--filter", "@swiftdrop/web", "build"], { stdio: "inherit", cwd: root, env, shell: process.platform === "win32" });
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });

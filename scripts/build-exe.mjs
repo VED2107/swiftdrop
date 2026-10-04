@@ -18,7 +18,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const work = join(root, "release", ".build");
 const out = join(root, "release", process.platform === "win32" ? "SwiftDrop.exe" : "swiftdrop");
 const webDist = join(root, "apps", "web", "dist");
-const run = (cmd, args, opts = {}) => execFileSync(cmd, args, { stdio: "inherit", cwd: root, shell: process.platform === "win32", ...opts });
+const run = (cmd, args, opts = {}) => {
+  if (cmd === "pnpm") return execFileSync("corepack", ["pnpm", ...args], { stdio: "inherit", cwd: root, shell: process.platform === "win32", ...opts });
+  return execFileSync(cmd, args, { stdio: "inherit", cwd: root, shell: process.platform === "win32", ...opts });
+};
 
 rmSync(work, { recursive: true, force: true });
 mkdirSync(work, { recursive: true });

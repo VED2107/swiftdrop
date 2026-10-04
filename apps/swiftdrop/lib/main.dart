@@ -14,7 +14,10 @@ import 'app/settings.dart';
 import 'app/web_assets.dart';
 
 /// Shown to browser guests (`/api/info`) and in About.
-const appVersion = String.fromEnvironment('SWIFTDROP_VERSION', defaultValue: '0.3.0');
+const appVersion = String.fromEnvironment(
+  'SWIFTDROP_VERSION',
+  defaultValue: '1.0.0',
+);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +25,9 @@ Future<void> main() async {
   // two instances can run side by side on one computer (development and testing).
   final profile = Platform.environment['SWIFTDROP_PROFILE'];
   final base = await getApplicationSupportDirectory();
-  final support = profile == null || profile.isEmpty ? base : Directory(p.join(base.path, 'profiles', profile));
+  final support = profile == null || profile.isEmpty
+      ? base
+      : Directory(p.join(base.path, 'profiles', profile));
   await support.create(recursive: true);
   final settingsFile = SettingsFile(p.join(support.path, 'settings.json'));
   final settings = settingsFile.load();
@@ -32,44 +37,51 @@ Future<void> main() async {
   if (!demoMode) {
     final downloads = settings.downloadDir ?? await _defaultDownloads(profile);
     // Phones without the app (an iPhone) pair by QR and use the bundled browser client.
-    final webRoot = await extractWebClient(support.path).catchError((Object _) => null);
+    final webRoot = await extractWebClient(support.path)
+        .catchError((Object _) => null);
     try {
-      engine = await EngineHost.spawn(EngineConfig(
-        dataDir: p.join(support.path, 'engine'),
-        downloadDir: downloads,
-        name: _deviceName(),
-        kind: _deviceKind(),
-        platform: _platform(),
-        mobile: Platform.isAndroid || Platform.isIOS,
-        lanes: Platform.isAndroid || Platform.isIOS ? 2 : 4,
-        webRoot: webRoot,
-        version: appVersion,
-      ));
+      engine = await EngineHost.spawn(
+        EngineConfig(
+          dataDir: p.join(support.path, 'engine'),
+          downloadDir: downloads,
+          name: _deviceName(),
+          kind: _deviceKind(),
+          platform: _platform(),
+          mobile: Platform.isAndroid || Platform.isIOS,
+          lanes: Platform.isAndroid || Platform.isIOS ? 2 : 4,
+          webRoot: webRoot,
+          version: appVersion,
+        ),
+      );
       await engine.setDuplicates(settings.duplicates);
     } catch (e) {
       engineError = e;
       debugPrint('SwiftDrop engine failed to start: $e');
     }
-    if (settings.downloadDir == null) settingsFile.save(settings.copyWith(downloadDir: downloads));
+    if (settings.downloadDir == null) {
+      settingsFile.save(settings.copyWith(downloadDir: downloads));
+    }
   }
 
-  runApp(ProviderScope(
-    overrides: [
-      settingsFileProvider.overrideWithValue(settingsFile),
-      if (engine != null) ...[
-        engineProvider.overrideWithValue(engine),
-        deviceDirectoryProvider.overrideWithValue(engine),
-        transferServiceProvider.overrideWithValue(engine.transferService),
-        transferHistoryProvider.overrideWithValue(engine.history),
+  runApp(
+    ProviderScope(
+      overrides: [
+        settingsFileProvider.overrideWithValue(settingsFile),
+        if (engine != null) ...[
+          engineProvider.overrideWithValue(engine),
+          deviceDirectoryProvider.overrideWithValue(engine),
+          transferServiceProvider.overrideWithValue(engine.transferService),
+          transferHistoryProvider.overrideWithValue(engine.history),
+        ],
+        if (demoMode) ...[
+          deviceDirectoryProvider.overrideWithValue(DemoDeviceDirectory()),
+          transferServiceProvider.overrideWithValue(DemoTransferService()),
+          transferHistoryProvider.overrideWithValue(DemoTransferHistory()),
+        ],
       ],
-      if (demoMode) ...[
-        deviceDirectoryProvider.overrideWithValue(DemoDeviceDirectory()),
-        transferServiceProvider.overrideWithValue(DemoTransferService()),
-        transferHistoryProvider.overrideWithValue(DemoTransferHistory()),
-      ],
-    ],
-    child: SwiftDropApp(engineError: engineError),
-  ));
+      child: SwiftDropApp(engineError: engineError),
+    ),
+  );
 }
 
 /// Downloads/SwiftDrop on desktop; the app's Documents/SwiftDrop on phones (visible in
@@ -80,7 +92,10 @@ Future<String> _defaultDownloads(String? profile) async {
     base = await getDownloadsDirectory();
   } catch (_) {}
   base ??= await getApplicationDocumentsDirectory();
-  return p.join(base.path, profile == null || profile.isEmpty ? 'SwiftDrop' : 'SwiftDrop ($profile)');
+  return p.join(
+    base.path,
+    profile == null || profile.isEmpty ? 'SwiftDrop' : 'SwiftDrop ($profile)',
+  );
 }
 
 String _deviceName() {
@@ -92,13 +107,15 @@ String _deviceName() {
   return host.isEmpty ? 'This computer' : host;
 }
 
-DeviceKind _deviceKind() => Platform.isIOS || Platform.isAndroid ? DeviceKind.phone : (Platform.isMacOS ? DeviceKind.laptop : DeviceKind.desktop);
+DeviceKind _deviceKind() => Platform.isIOS || Platform.isAndroid
+    ? DeviceKind.phone
+    : (Platform.isMacOS ? DeviceKind.laptop : DeviceKind.desktop);
 
 DevicePlatform _platform() => switch (Platform.operatingSystem) {
-      'ios' => DevicePlatform.ios,
-      'android' => DevicePlatform.android,
-      'windows' => DevicePlatform.windows,
-      'macos' => DevicePlatform.macos,
-      'linux' => DevicePlatform.linux,
-      _ => DevicePlatform.unknown,
-    };
+  'ios' => DevicePlatform.ios,
+  'android' => DevicePlatform.android,
+  'windows' => DevicePlatform.windows,
+  'macos' => DevicePlatform.macos,
+  'linux' => DevicePlatform.linux,
+  _ => DevicePlatform.unknown,
+};

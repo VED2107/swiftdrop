@@ -94,7 +94,18 @@ class AppShell extends ConsumerWidget {
             destinations: destinations,
             selected: shell.currentIndex,
             onSelect: _go,
-            header: Row(children: [const SwiftMark(size: 30), const SizedBox(width: SdSpace.s3), Text('SwiftDrop', style: context.sdText.title)]),
+            header: Row(children: [
+              const SwiftMark(size: 30),
+              const SizedBox(width: SdSpace.s3),
+              // The rail is 192 wide at its narrowest: the wordmark scales down to fit.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text('SwiftDrop', style: context.sdText.title, maxLines: 1),
+                ),
+              ),
+            ]),
             footer: const _SidebarFooter(),
           ),
         ),

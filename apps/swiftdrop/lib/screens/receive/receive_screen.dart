@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:swiftdrop_core/swiftdrop_core.dart';
@@ -19,8 +18,11 @@ class ReceiveScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final transfers = ref.watch(transfersProvider).value ?? const <TransferSnapshot>[];
-    final incoming = transfers.where((t) => t.role == TransferRole.receiving && !t.phase.isFinished).toList();
+    final transfers =
+        ref.watch(transfersProvider).value ?? const <TransferSnapshot>[];
+    final incoming = transfers
+        .where((t) => t.role == TransferRole.receiving && !t.phase.isFinished)
+        .toList();
     return ScreenFrame(
       title: 'Ready to receive',
       subtitle: 'Files come straight to this device.',
@@ -28,7 +30,10 @@ class ReceiveScreen extends ConsumerWidget {
       children: [
         const SizedBox(height: SdSpace.s6),
         for (final t in incoming) ...[
-          TransferGlassCard(transfer: t, onOpen: () => context.push(Routes.transfer(t.transferId))),
+          TransferGlassCard(
+            transfer: t,
+            onOpen: () => context.push(Routes.transfer(t.transferId)),
+          ),
           const SizedBox(height: SdSpace.s4),
         ],
         const ReceiveCard(),
@@ -72,27 +77,51 @@ class _ReceiveCardState extends ConsumerState<ReceiveCard> {
     return LiquidGlass(
       level: GlassLevel.regular,
       padding: const EdgeInsets.all(SdSpace.s5),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        if (compact) ...[
-          Align(alignment: Alignment.centerLeft, child: Text('Ready to receive', style: t.section)),
-          const SizedBox(height: SdSpace.s4),
-        ],
-        UniversalQr(endpoint: ep, size: compact ? 180 : 232),
-        const SizedBox(height: SdSpace.s3),
-        Text('Visible as ${ep.name}', style: t.caption, textAlign: TextAlign.center),
-        if (dir != null) ...[
-          const SizedBox(height: SdSpace.s4),
-          const Divider(height: 1, color: SdColors.hairline),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          if (compact) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Ready to receive', style: t.section),
+            ),
+            const SizedBox(height: SdSpace.s4),
+          ],
+          UniversalQr(endpoint: ep, size: compact ? 180 : 232),
           const SizedBox(height: SdSpace.s3),
-          Row(children: [
-            const Icon(SdIcons.folder, size: 18, color: SdColors.text2),
-            const SizedBox(width: SdSpace.s2),
-            Expanded(child: Text(dir, style: t.caption, maxLines: 2, overflow: TextOverflow.ellipsis)),
-            if (!(Platform.isAndroid || Platform.isIOS))
-              GlassButton(label: 'Show', kind: GlassButtonKind.quiet, compact: true, onPressed: () => revealFolder(dir)),
-          ]),
+          Text(
+            'Visible as ${ep.name}',
+            style: t.caption,
+            textAlign: TextAlign.center,
+          ),
+          if (dir != null) ...[
+            const SizedBox(height: SdSpace.s4),
+            const Divider(height: 1, color: SdColors.hairline),
+            const SizedBox(height: SdSpace.s3),
+            Row(
+              children: [
+                const Icon(SdIcons.folder, size: 18, color: SdColors.text2),
+                const SizedBox(width: SdSpace.s2),
+                Expanded(
+                  child: Text(
+                    dir,
+                    style: t.caption,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (!(Platform.isAndroid || Platform.isIOS))
+                  GlassButton(
+                    label: 'Show',
+                    kind: GlassButtonKind.quiet,
+                    compact: true,
+                    onPressed: () => revealFolder(dir),
+                  ),
+              ],
+            ),
+          ],
         ],
-      ]),
+      ),
     );
   }
 }

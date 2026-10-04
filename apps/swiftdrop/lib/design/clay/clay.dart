@@ -346,7 +346,7 @@ class TransferRail extends StatefulWidget {
 enum RailState { idle, linked, moving, done }
 
 class _TransferRailState extends State<TransferRail> with SingleTickerProviderStateMixin {
-  late final _t = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat();
+  late final _t = AnimationController(vsync: this, duration: const Duration(seconds: 1));
   double _phase = 0;
   double _clock = 0;
   double? _burstAt;
@@ -362,6 +362,17 @@ class _TransferRailState extends State<TransferRail> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _t.addListener(_advance);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reduce Motion paints a still rail: no frames are scheduled for it at all.
+    if (SdAppearance.of(context).reduceMotion) {
+      _t.stop();
+    } else if (!_t.isAnimating) {
+      _t.repeat();
+    }
   }
 
   void _advance() {
@@ -576,7 +587,15 @@ class ClayChoiceKey extends StatelessWidget {
               const SizedBox(width: 8),
               Icon(icon, size: 16, color: SdColors.text2),
               const SizedBox(width: 6),
-              Text(label, style: t.label.copyWith(color: selected ? SdColors.text : SdColors.text2)),
+              // Narrow segments (170 wide on a small phone) ellipsize instead of overflowing.
+              Flexible(
+                child: Text(
+                  label,
+                  style: t.label.copyWith(color: selected ? SdColors.text : SdColors.text2),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ]),
           ),
         ),

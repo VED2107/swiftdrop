@@ -1,9 +1,11 @@
 import { formatBytes, formatCount } from "@swiftdrop/shared";
 import type { TransferJob } from "@swiftdrop/transfer-engine";
-import { ChevronDown, FileText, Film, FolderOpen, ImageIcon, Pause, Play, RotateCcw, X } from "lucide-react";
+import { Check, ChevronDown, FileText, Film, FolderOpen, ImageIcon, Pause, Play, RotateCcw, X } from "lucide-react";
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Api } from "../lib/api.ts";
 import { kindOf } from "../lib/files.ts";
+import { markTransferUi } from "../lib/latency.ts";
+import { Rail } from "./Rail.tsx";
 import { notify, useApp } from "../lib/store.ts";
 import type { Reading } from "../lib/reading.ts";
 import { humanDuration, humanEta } from "../lib/recent.ts";
@@ -30,12 +32,19 @@ export function TransferFocus({
   onDone: () => void;
 }) {
   const sending = r.flow === (perspective === "guest" ? "to-pc" : "to-phone");
+  const jobId = r.job?.id;
+  useEffect(() => {
+    if (jobId) markTransferUi(jobId);
+  }, [jobId]);
   if (r.state === "complete") return <Success r={r} sending={sending} host={perspective === "host"} onDone={onDone} />;
 
   const pct = r.bytesTotal > 0 ? (r.bytesDone / r.bytesTotal) * 100 : r.filesTotal ? (r.filesDone / r.filesTotal) * 100 : 0;
   const live = r.state === "running" || r.state === "active";
   const verb = sending ? `Sending to ${peer}` : `Receiving from ${peer}`;
   const job = r.job;
+  // No bytes confirmed yet: the transfer is opening (manifest round trip, first request in
+  // flight). Say so plainly instead of a vague "getting ready"; it lasts milliseconds.
+  const starting = r.bytesDone === 0 && (r.state === "preparing" || r.state === "queued" || r.state === "running");
 
   if (r.state === "reconnecting") {
     return (
@@ -54,7 +63,7 @@ export function TransferFocus({
         <div className="min-w-0">
           <div className="t-small flex items-center gap-2" style={{ color: "var(--text-2)" }}>
             <span className="dot" data-state={live ? "live" : r.state === "failed" ? "warn" : undefined} />
-            {r.state === "paused" ? "Paused" : r.state === "preparing" ? "Getting ready" : r.state === "awaiting-decision" ? "Waiting for your choice" : r.state === "failed" ? "Stopped" : verb}
+            {r.state === "paused" ? "Paused" : r.state === "awaiting-decision" ? "Waiting for your choice" : r.state === "failed" ? "Stopped" : verb}
           </div>
           <h2 className="t-h2 mt-1 truncate">{r.title}</h2>
         </div>
@@ -83,12 +92,19 @@ export function TransferFocus({
       </div>
 
       <div className="flex flex-col gap-3">
-        <div className="bar" data-tone={r.state === "paused" ? "paused" : undefined} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.floor(pct)} aria-label="Progress">
-          <span style={{ "--p": pct / 100 } as React.CSSProperties} />
-        </div>
+        <Rail
+          state={r.state === "paused" ? "paused" : live ? "moving" : "linked"}
+          progress={pct / 100}
+          speed={r.speed}
+          left={sending ? (perspective === "guest" ? "iPhone" : "PC") : peer}
+          right={sending ? peer : perspective === "guest" ? "iPhone" : "PC"}
+          leftKind={sending === (perspective === "guest") ? "phone" : "pc"}
+          rightKind={sending === (perspective === "guest") ? "pc" : "phone"}
+          label="Progress"
+        />
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
           <span className="t-small num" style={{ color: "var(--text-2)" }}>
-            {r.state === "paused" ? "Paused. Nothing is lost." : live ? humanEta(r.eta) : r.message ?? "…"}
+            {r.state === "paused" ? "Paused. Nothing is lost." : starting ? "Starting…" : live ? humanEta(r.eta) : r.message ?? "…"}
           </span>
           <span className="t-small num">
             {r.peak > 0 ? `Peak ${formatBytes(r.peak)}/s` : "Measuring"}
@@ -139,19 +155,22 @@ function Success({ r, sending, host, onDone }: { r: Reading; sending: boolean; h
   const secs = r.job ? r.job.snapshot().elapsedSeconds : r.average > 0 ? r.bytesTotal / r.average : 0;
   return (
     <section className="flex flex-col items-center text-center gap-5 py-6" aria-live="polite">
-      <div className="check" aria-hidden>
-        <svg width="28" height="28" viewBox="0 0 28 28">
-          <path d="M7 14.5l4.5 4.5L21 9.5" fill="none" stroke="var(--accent)" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" />
+      <div className="check check-done" aria-hidden>
+        <svg width="34" height="34" viewBox="0 0 28 28">
+          <path d="M7 14.5l4.5 4.5L21 9.5" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col items-center gap-2">
         <h2 className="t-h1">Transfer complete</h2>
+        <span className="verified">
+          <Check size={14} strokeWidth={2.5} /> Verified
+        </span>
         <p className="t-lead num">
           {formatCount(r.filesTotal)} {r.filesTotal === 1 ? "file" : "files"} {sending ? "sent" : "received"} · {formatBytes(r.bytesTotal)}
         </p>
         <p className="t-small num">
-          {humanDuration(secs)}
-          {r.average > 0 ? ` · ${formatBytes(r.average)}/s average` : ""}
+          Completed in {humanDuration(secs)}
+          {r.average > 0 ? ` at ${formatBytes(r.average)}/s` : ""}
         </p>
       </div>
       {landedHere && (
@@ -165,7 +184,7 @@ function Success({ r, sending, host, onDone }: { r: Reading; sending: boolean; h
             <FolderOpen size={16} strokeWidth={1.75} /> Show in folder
           </button>
         )}
-        <button className="btn btn-secondary" onClick={onDone}>
+        <button className={`btn ${landedHere ? "btn-secondary" : "btn-primary"} btn-lg`} onClick={onDone}>
           {sending ? "Send more" : "Done"}
         </button>
       </div>

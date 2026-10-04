@@ -73,11 +73,11 @@ class _LiquidGlassState extends State<LiquidGlass> {
   /// A real blur counts against the budget only while it can be seen: offstage tabs and
   /// covered routes run with tickers disabled.
   void _syncBudget() {
-    final blurs = SdMaterials.spec(widget.level, SdAppearance.of(context).glass).blurSigma > 0;
-    final want = blurs && TickerMode.valuesOf(context).enabled;
-    if (want == _counted) return;
-    _counted = want;
-    want ? GlassBudget.instance._acquire() : GlassBudget.instance._release();
+    // Clay never blurs, so nothing counts against the budget any more; release if a
+    // previous build had counted.
+    if (!_counted) return;
+    _counted = false;
+    GlassBudget.instance._release();
   }
 
   @override
@@ -90,35 +90,37 @@ class _LiquidGlassState extends State<LiquidGlass> {
     Color mix(Color c) => tint == null ? c : Color.alphaBlend(tint.withValues(alpha: widget.tintStrength), c);
     final lit = widget.interactive && _hover;
 
+    // "Clay console" (2026-10-04): the surface is matte molded clay, not glass. Opaque, lit
+    // from above, a soft drop below; no backdrop blur, no rim glow. Sheets and floating
+    // chrome sit a little higher (bigger drop), quiet surfaces a little flatter.
+    final floating = widget.level == GlassLevel.sheet || widget.level == GlassLevel.floating;
+    final base = floating ? const Color(0xFF231E23) : const Color(0xFF1D191D);
     Widget surface = CustomPaint(
       foregroundPainter: _EdgePainter(
         radius: radius,
-        border: lit ? Color.lerp(spec.border, const Color(0x40FFFFFF), 0.6)! : spec.border,
-        highlight: spec.highlight,
-        pointer: widget.interactive && appearance.glass != GlassMode.off ? _pointer : null,
+        border: lit ? const Color(0x1FFFFFFF) : const Color(0x0AFFFFFF),
+        highlight: const Color(0x1FFFFFFF),
       ),
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [mix(spec.fillTop), mix(spec.fillBottom)],
+            colors: [mix(Color.lerp(base, const Color(0xFFFFFFFF), 0.035)!), mix(base)],
           ),
         ),
         child: Padding(padding: widget.padding, child: widget.child),
       ),
     );
 
-    if (spec.blurSigma > 0) {
-      final blur = ui.ImageFilter.blur(sigmaX: spec.blurSigma, sigmaY: spec.blurSigma, tileMode: TileMode.mirror);
-      final filter = spec.saturation == 1 ? blur : ui.ImageFilter.compose(outer: blur, inner: _saturate(spec.saturation));
-      // Grouped: sibling glass surfaces share one backdrop read (BackdropGroup in the app root).
-      surface = BackdropFilter.grouped(filter: filter, child: surface);
-    }
-
     Widget glass = RepaintBoundary(
       child: DecoratedBox(
-        decoration: ShapeDecoration(shape: shape, shadows: spec.shadows),
+        decoration: ShapeDecoration(
+          shape: shape,
+          shadows: [
+            BoxShadow(color: const Color(0x99000000), offset: Offset(0, floating ? 18 : 10), blurRadius: floating ? 40 : 24, spreadRadius: -8),
+          ],
+        ),
         child: ClipRSuperellipse(borderRadius: BorderRadius.all(radius), child: surface),
       ),
     );
@@ -144,18 +146,6 @@ class _LiquidGlassState extends State<LiquidGlass> {
       child: glass,
     );
   }
-}
-
-/// Saturation matrix (luminance-preserving), so colour behind the glass reads through.
-ui.ColorFilter _saturate(double s) {
-  const r = 0.2126, g = 0.7152, b = 0.0722;
-  final i = 1 - s;
-  return ui.ColorFilter.matrix([
-    r * i + s, g * i, b * i, 0, 0, //
-    r * i, g * i + s, b * i, 0, 0,
-    r * i, g * i, b * i + s, 0, 0,
-    0, 0, 0, 1, 0,
-  ]);
 }
 
 class _EdgePainter extends CustomPainter {
@@ -225,6 +215,7 @@ class GlassBudget {
 
   final ValueNotifier<int> active = ValueNotifier(0);
 
+  // ignore: unused_element
   void _acquire() {
     active.value++;
     if (kDebugMode && active.value > SdMaterials.blurBudget) {

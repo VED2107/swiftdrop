@@ -21,8 +21,8 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir={#Root}\release
 OutputBaseFilename=SwiftDrop-Setup-{#AppVersion}
-SetupIconFile={#Root}\assets\brand\swiftdrop.ico
-UninstallDisplayIcon={app}\SwiftDrop.exe
+SetupIconFile={#Root}\apps\swiftdrop\windows\runner\resources\app_icon.ico
+UninstallDisplayIcon={app}\swiftdrop.exe
 UninstallDisplayName=SwiftDrop
 WizardStyle=modern
 Compression=lzma2/ultra64
@@ -44,19 +44,21 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "firewall"; Description: "Let phones on private Wi-Fi reach SwiftDrop (Windows Firewall rule)"; Check: IsAdminInstallMode
 
 [Files]
-Source: "{#Root}\release\SwiftDrop.exe"; DestDir: "{app}"; Flags: ignoreversion
+; The Flutter app: swiftdrop.exe, its engine DLLs and the data folder (assets, including
+; the bundled web client an iPhone opens from the QR).
+Source: "{#Root}\apps\swiftdrop\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\SwiftDrop"; Filename: "{app}\SwiftDrop.exe"; Comment: "Send files between your phone and this PC"
-Name: "{autodesktop}\SwiftDrop"; Filename: "{app}\SwiftDrop.exe"; Tasks: desktopicon
+Name: "{autoprograms}\SwiftDrop"; Filename: "{app}\swiftdrop.exe"; Comment: "Send files between your phone and this PC"
+Name: "{autodesktop}\SwiftDrop"; Filename: "{app}\swiftdrop.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""SwiftDrop"""; Flags: runhidden; Tasks: firewall
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""SwiftDrop"" dir=in action=allow program=""{app}\SwiftDrop.exe"" profile=private enable=yes"; Flags: runhidden; Tasks: firewall
-Filename: "{app}\SwiftDrop.exe"; Description: "{cm:LaunchProgram,SwiftDrop}"; Flags: nowait postinstall skipifsilent
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""SwiftDrop"" dir=in action=allow program=""{app}\swiftdrop.exe"" profile=private enable=yes"; Flags: runhidden; Tasks: firewall
+Filename: "{app}\swiftdrop.exe"; Description: "{cm:LaunchProgram,SwiftDrop}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM SwiftDrop.exe"; Flags: runhidden; RunOnceId: "StopSwiftDrop"
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM swiftdrop.exe"; Flags: runhidden; RunOnceId: "StopSwiftDrop"
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""SwiftDrop"""; Flags: runhidden; RunOnceId: "DelFirewall"; Check: IsAdminInstallMode
 
-; Settings and pairings in %USERPROFILE%\.swiftdrop, and received files, are the user's: left in place.
+; Settings, pairings and received files belong to the user: left in place.

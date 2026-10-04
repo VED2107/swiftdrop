@@ -1545,10 +1545,9 @@
        "f_small1",
        "f_empty1",
        "f_small2",
-       "f_small3",
-       "f_small4"
+       "f_small3"
       ],
-      "bytes": 130000
+      "bytes": 120000
      },
      "finished": false
     },
@@ -1560,6 +1559,18 @@
       "file": "f_large1",
       "start": 0,
       "count": 2
+     },
+     "finished": false
+    },
+    {
+     "op": "next",
+     "blocksPerChunk": 2,
+     "result": {
+      "kind": "batch",
+      "files": [
+       "f_small4"
+      ],
+      "bytes": 10000
      },
      "finished": false
     },
@@ -1575,25 +1586,13 @@
      "finished": false
     },
     {
-     "op": "next",
-     "blocksPerChunk": 2,
-     "result": {
-      "kind": "blocks",
-      "file": "f_mid001",
-      "start": 0,
-      "count": 1
-     },
-     "finished": false
-    },
-    {
      "op": "ack",
      "item": 0,
      "completed": [
       "f_small1",
       "f_empty1",
       "f_small2",
-      "f_small3",
-      "f_small4"
+      "f_small3"
      ],
      "finished": false
     },
@@ -1605,7 +1604,9 @@
     {
      "op": "ack",
      "item": 2,
-     "completed": [],
+     "completed": [
+      "f_small4"
+     ],
      "finished": false
     },
     {
@@ -1635,7 +1636,7 @@
      "blocksPerChunk": 1,
      "result": {
       "kind": "blocks",
-      "file": "f_large2",
+      "file": "f_mid001",
       "start": 0,
       "count": 1
      },
@@ -1644,9 +1645,7 @@
     {
      "op": "ack",
      "item": 3,
-     "completed": [
-      "f_mid001"
-     ],
+     "completed": [],
      "finished": false
     },
     {

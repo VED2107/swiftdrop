@@ -106,7 +106,12 @@ class ReceiverOptions {
     this.onProgress,
     this.onComplete,
     this.onForget,
+    this.directions = const {Direction.toPeer},
   }) : duplicates = duplicates ?? (() => DuplicatePolicy.keepBoth);
+
+  /// Manifest directions this receiver serves: device ↔ device always; `toHost` too when
+  /// this device also hosts browser guests (an iPhone uploading through the web client).
+  final Set<Direction> directions;
 
   final SinkFactory sinks;
   final StateStore? state;
@@ -258,7 +263,7 @@ class Receiver {
   }
 
   Future<Map<String, Object?>> _create(Manifest input, String? peerId) async {
-    if (input.direction != Direction.toPeer) throw ProtocolException(ErrorCode.forbidden);
+    if (!opts.directions.contains(input.direction)) throw ProtocolException(ErrorCode.forbidden);
     final existing = await _find(input.transferId);
     if (existing != null) {
       if (existing.files.length != input.files.length || input.files.any((f) => existing.byId[f.id]?.size != f.size)) {

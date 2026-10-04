@@ -9,6 +9,7 @@ import 'package:swiftdrop_core/swiftdrop_core.dart';
 import '../../app/picking.dart';
 import '../../app/providers.dart';
 import '../../app/router.dart';
+import '../../app/shell.dart';
 import '../../design/design.dart';
 import '../screen_frame.dart';
 
@@ -260,15 +261,43 @@ class _Complete extends ConsumerWidget {
               ? const StatusPill(label: 'Verified: every file matches the original', icon: SdIcons.verified, tone: StatusTone.live)
               : const StatusPill(label: 'Complete', icon: SdIcons.check),
         ),
-        const SizedBox(height: SdSpace.s8),
-        PrimaryAction(label: 'Done', expand: true, onPressed: onDone),
-        if (receiving && s.location != null && !(Platform.isAndroid || Platform.isIOS)) ...[
-          const SizedBox(height: SdSpace.s2),
-          GlassButton(label: 'Show in folder', icon: SdIcons.openFolder, kind: GlassButtonKind.quiet, expand: true, onPressed: () => revealFolder(s.location!)),
+        if (record != null) ...[
+          const SizedBox(height: SdSpace.s3),
+          Center(child: Text('Completed in ${_took(record.finishedAt.difference(record.startedAt))}', style: t.caption)),
         ],
+        const SizedBox(height: SdSpace.s8),
+        if (receiving && s.location != null && !(Platform.isAndroid || Platform.isIOS)) ...[
+          PrimaryAction(label: 'View files', icon: SdIcons.openFolder, expand: true, onPressed: () => revealFolder(s.location!)),
+          const SizedBox(height: SdSpace.s2),
+          SecondaryAction(label: 'Done', expand: true, onPressed: onDone),
+        ] else if (!receiving) ...[
+          PrimaryAction(
+            label: 'Send more',
+            icon: SdIcons.send,
+            expand: true,
+            onPressed: () async {
+              final router = GoRouter.of(context);
+              onDone();
+              final nav = router.routerDelegate.navigatorKey.currentContext;
+              if (nav != null && nav.mounted) await startSend(nav, ref, deviceId: s.peerId);
+            },
+          ),
+          const SizedBox(height: SdSpace.s2),
+          SecondaryAction(label: 'Done', expand: true, onPressed: onDone),
+        ] else
+          PrimaryAction(label: 'Done', expand: true, onPressed: onDone),
       ],
     );
   }
+}
+
+String _took(Duration d) {
+  final s = d.inMilliseconds / 1000;
+  if (s < 1) return 'under a second';
+  if (s < 60) return '${s.round()} ${s.round() == 1 ? 'second' : 'seconds'}';
+  final m = d.inMinutes;
+  final rest = d.inSeconds % 60;
+  return rest == 0 ? '$m min' : '$m min $rest s';
 }
 
 /// The transfer isn't live any more (dismissed, or the app restarted): show what history knows.

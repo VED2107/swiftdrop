@@ -9,6 +9,7 @@ import '../../app/connect_code.dart';
 import '../../app/providers.dart';
 import '../../app/shell.dart';
 import '../../design/design.dart';
+import '../receive/universal_qr.dart';
 import '../screen_frame.dart';
 
 enum _Mode { show, enter }
@@ -152,7 +153,6 @@ class _ShowCode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.sdText;
     final ep = endpoint;
     if (ep == null || ep.primary == null) {
       return const EmptyState(
@@ -162,13 +162,7 @@ class _ShowCode extends StatelessWidget {
       );
     }
     return Column(children: [
-      Text('Scan this code with the other device', style: t.bodyStrong, textAlign: TextAlign.center),
-      const SizedBox(height: SdSpace.s1),
-      Text('or enter its address there', style: t.caption, textAlign: TextAlign.center),
-      const SizedBox(height: SdSpace.s4),
-      QrCodeGlassContainer(data: connectUri(ep)),
-      const SizedBox(height: SdSpace.s4),
-      SelectableText(ep.primary!, style: t.numeric, textAlign: TextAlign.center),
+      UniversalQr(endpoint: ep),
       const SizedBox(height: SdSpace.s4),
       const _Waiting(),
     ]);

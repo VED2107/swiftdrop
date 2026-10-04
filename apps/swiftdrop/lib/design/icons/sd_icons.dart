@@ -20,6 +20,9 @@ abstract final class SdIcons {
   static const send = TablerIcons.plus;
   static const upload = TablerIcons.upload;
   static const receive = TablerIcons.download;
+  static const sendUp = TablerIcons.arrow_up;
+  static const receiveDown = TablerIcons.arrow_down;
+  static const phone = TablerIcons.device_mobile;
   static const check = TablerIcons.check;
   static const verified = TablerIcons.circle_check;
   static const qr = TablerIcons.qrcode;

@@ -23,6 +23,9 @@ final transfersProvider = StreamProvider<List<TransferSnapshot>>((ref) => ref.wa
 final incomingProvider = StreamProvider<List<IncomingOffer>>((ref) => ref.watch(transferServiceProvider).incoming());
 final historyProvider = StreamProvider<List<TransferRecord>>((ref) => ref.watch(transferHistoryProvider).watch());
 
+/// Phones without the app asking to connect (an iPhone scanned the browser QR).
+final browserJoinsProvider = StreamProvider<List<BrowserJoin>>((ref) => ref.watch(engineProvider)?.joins() ?? Stream.value(const <BrowserJoin>[]));
+
 /// One transfer by id (the transfer screen watches only this).
 final transferProvider = Provider.family<TransferSnapshot?, String>((ref, id) {
   final list = ref.watch(transfersProvider).value ?? const [];

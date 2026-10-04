@@ -21,3 +21,7 @@ export 'src/transport/peer_rpc.dart';
 export 'src/transport/tcp_link.dart';
 export 'src/util/random.dart';
 export 'src/transport/lanes.dart';
+export 'src/web/web_auth.dart';
+export 'src/web/web_host.dart';
+export 'src/web/zip.dart';
+export 'src/web/http_transport.dart';

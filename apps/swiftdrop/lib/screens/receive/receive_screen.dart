@@ -6,11 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:swiftdrop_core/swiftdrop_core.dart';
 
-import '../../app/connect_code.dart';
 import '../../app/picking.dart';
 import '../../app/providers.dart';
 import '../../app/router.dart';
 import '../../design/design.dart';
+import 'universal_qr.dart';
 import '../screen_frame.dart';
 
 /// Ready to receive: how the other device reaches this one.
@@ -45,13 +45,20 @@ class ReceiveScreen extends ConsumerWidget {
 }
 
 /// This device's address and code, and where received files go. Used on the Receive
-/// screen and as the desktop side panel.
-class ReceiveCard extends ConsumerWidget {
+/// screen and as the desktop side panel. Two audiences: another SwiftDrop app, or a phone
+/// without the app (an iPhone), which scans a browser link instead.
+class ReceiveCard extends ConsumerStatefulWidget {
   const ReceiveCard({super.key, this.compact = false});
   final bool compact;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReceiveCard> createState() => _ReceiveCardState();
+}
+
+class _ReceiveCardState extends ConsumerState<ReceiveCard> {
+  @override
+  Widget build(BuildContext context) {
+    final compact = widget.compact;
     final t = context.sdText;
     final ep = ref.watch(endpointProvider).value;
     final dir = ref.watch(downloadDirProvider);
@@ -70,21 +77,9 @@ class ReceiveCard extends ConsumerWidget {
           Align(alignment: Alignment.centerLeft, child: Text('Ready to receive', style: t.section)),
           const SizedBox(height: SdSpace.s4),
         ],
-        QrCodeGlassContainer(data: connectUri(ep), size: compact ? 180 : 232, semanticLabel: 'Connection code for ${ep.name}'),
-        const SizedBox(height: SdSpace.s4),
-        Text('Visible as ${ep.name}', style: t.bodyStrong, textAlign: TextAlign.center),
-        const SizedBox(height: SdSpace.s1),
-        Text('On the other device, choose Connect and enter', style: t.caption, textAlign: TextAlign.center),
-        const SizedBox(height: SdSpace.s2),
-        // The address never wraps mid-number: it scales down on narrow panels instead.
-        FittedBox(fit: BoxFit.scaleDown, child: SelectableText(ep.primary!, style: t.numeric, maxLines: 1)),
-        GlassButton(
-          label: 'Copy address',
-          icon: SdIcons.copy,
-          kind: GlassButtonKind.quiet,
-          compact: true,
-          onPressed: () => Clipboard.setData(ClipboardData(text: ep.primary!)),
-        ),
+        UniversalQr(endpoint: ep, size: compact ? 180 : 232),
+        const SizedBox(height: SdSpace.s3),
+        Text('Visible as ${ep.name}', style: t.caption, textAlign: TextAlign.center),
         if (dir != null) ...[
           const SizedBox(height: SdSpace.s4),
           const Divider(height: 1, color: SdColors.hairline),

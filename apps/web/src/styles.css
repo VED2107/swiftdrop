@@ -561,7 +561,7 @@ body::before {
     width: 100%;
     height: 1.5px;
     margin-top: -0.75px;
-    background: linear-gradient(90deg, var(--hairline-2), oklch(0.91 0.19 124 / 0.55) 50%, var(--hairline-2));
+    background: linear-gradient(90deg, var(--hairline-2), var(--accent-a24) 50%, var(--hairline-2));
     transform-origin: center;
     animation: line-in 700ms var(--ease-out) both;
   }

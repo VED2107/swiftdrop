@@ -177,7 +177,7 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
   route("GET", "/api/stats", "authed", ({ res }) => {
     const cpu = process.cpuUsage();
     const mem = process.memoryUsage();
-    json(res, 200, { cpuUserMs: cpu.user / 1000, cpuSystemMs: cpu.system / 1000, rss: mem.rss, heapUsed: mem.heapUsed, uptime: process.uptime(), writeLoad: store.load, pipeline: store.metrics() });
+    json(res, 200, { cpuUserMs: cpu.user / 1000, cpuSystemMs: cpu.system / 1000, rss: mem.rss, heapUsed: mem.heapUsed, uptime: process.uptime(), writeLoad: store.load, pipeline: store.metrics(), arrivals: store.arrivalTimes() });
   });
 
   /** Raw-link baseline for the benchmark: reads and discards the body, nothing else. */
@@ -320,6 +320,7 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
 
   route("PUT", "/api/transfers/:id/files/:id/blocks/(\\d{1,9})", "authed", async ({ req, res, params }) => {
     const t = await store.get(params[0]!);
+    store.noteData(t);
     const r0 = performance.now();
     const body = await readBody(req, MAX_BLOCKS_PER_CHUNK * BLOCK_SIZE);
     store.noteReceive(body.length, performance.now() - r0);
@@ -329,6 +330,7 @@ export function createApp(config: ServerConfig, log: Logger = createLogger("serv
 
   route("POST", "/api/transfers/:id/batch", "authed", async ({ req, res, params }) => {
     const t = await store.get(params[0]!);
+    store.noteData(t);
     const r0 = performance.now();
     const body = await readBody(req, BATCH_TARGET_BYTES + (2 << 20));
     store.noteReceive(body.length, performance.now() - r0);

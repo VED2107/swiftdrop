@@ -1,17 +1,17 @@
 import 'package:flutter/painting.dart';
 
-/// SwiftDrop native palette. Near-black environment, soft white type, one red accent
+/// SwiftDrop native palette ("Board, softened"). Warm graphite environment, soft white type, one red accent
 /// that only ever means "your file is moving / arrived intact". Change the accent here and
 /// it changes everywhere; nothing outside `lib/design/` names a colour.
 abstract final class SdColors {
   // Environment
-  static const ground = Color(0xFF0E0E10);
-  static const groundRaised = Color(0xFF141417);
+  static const ground = Color(0xFF131114); // warm graphite
+  static const groundRaised = Color(0xFF19161A);
 
   // Type (white at stepped opacity, never pure white)
-  static const text = Color(0xF0FFFFFF); // 0.94
-  static const text2 = Color(0xA3FFFFFF); // 0.64
-  static const text3 = Color(0x70FFFFFF); // 0.44
+  static const text = Color(0xF2FFFAF8); // 0.95, warm
+  static const text2 = Color(0xADFFF4F0); // 0.68, warm
+  static const text3 = Color(0x80FFF0EC); // 0.5, warm
 
   // Lines
   static const hairline = Color(0x14FFFFFF); // 0.08
@@ -29,8 +29,8 @@ abstract final class SdColors {
   static const onRed = Color(0xFFFFFFFF);
 
   /// Neutral light fields of the ambient environment.
-  static const ambientCool = Color(0xFF3A4150);
-  static const ambientWarm = Color(0xFF3B3530);
+  static const ambientCool = Color(0xFF463C50); // dusk violet-grey
+  static const ambientWarm = Color(0xFF4A2A28); // ember
 
   /// Scrim behind sheets.
   static const scrim = Color(0x8C000000);
@@ -41,7 +41,7 @@ abstract final class SdColors {
   /// QR tile: the one place with near-pure white on near-black, because scanners need
   /// maximum contrast (the code is never tinted, blurred or placed on glass).
   static const qrPaper = Color(0xFFFAFAFA);
-  static const qrInk = Color(0xFF0E0E10);
+  static const qrInk = Color(0xFF131114);
 
   /// Destructive / failure text and glyphs (with a word and an icon, never colour alone).
   static const warning = Color(0xFFFFB38A);

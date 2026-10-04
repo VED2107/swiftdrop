@@ -154,6 +154,8 @@ class _AmbientPainter extends CustomPainter {
     field(Offset(size.width * 0.12, size.height * 0.06) + wander(41, 53, 0), longest * 0.62, SdColors.ambientCool, 0.34 + 0.12 * breath);
     field(Offset(size.width * 0.96, size.height * 0.8) + wander(59, 47, 1.7), longest * 0.55, SdColors.ambientWarm, 0.28);
     // Where devices sit: a soft glow once one is connected.
+    // A soft red glow always sits high on the right: the board's warm light, never loud.
+    field(Offset(size.width * 0.78, -size.height * 0.08) + wander(53, 67, 0.9), longest * 0.5, SdColors.red, 0.1 + 0.03 * breath);
     field(Offset(size.width * 0.5, size.height * 0.3) + wander(37, 61, 2.4), shortest * 0.7, const Color(0xFF4A4A56), 0.22 * connected.value);
     // The red field, low, behind the primary actions; stronger while bytes move.
     final e = transfer.value;

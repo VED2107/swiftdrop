@@ -22,8 +22,16 @@ export interface StageTimes {
 
 export interface Telemetry {
   stages: StageTimes;
+  /** clock reading (the job's `now`) when start() ran; lets callers line up their own marks */
+  startedAt: number;
+  /** start() -> hasher ready (WASM compile on first use; cached afterwards) */
+  hasherMs: number;
+  /** manifest round trip: POST create -> receiver's answer (excludes a conflict prompt) */
+  createMs: number;
   /** start() -> first byte may move: manifest negotiation (and conflict checks on the receiver) */
   prepareMs: number;
+  /** start() -> first request body read into memory (first file bytes touched) */
+  startToFirstReadMs: number | null;
   /** start() -> first request body handed to the transport (includes the receiver's Accept) */
   startToFirstSendMs: number | null;
   /** start() -> first body acknowledged by the receiver */

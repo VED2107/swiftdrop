@@ -132,6 +132,17 @@ export interface PipelineMetrics {
   writeLatencyP95: number;
 }
 
+/** When a transfer's first bytes and first file reached this receiver, relative to its create. */
+export interface ArrivalTimes {
+  transferId: string;
+  files: number;
+  bytes: number;
+  /** create request handled -> first data request arrived (first byte at the PC) */
+  createToFirstByteMs: number | null;
+  /** create request handled -> first file verified and renamed into place */
+  createToFirstFileMs: number | null;
+}
+
 const STATE_DIR = ".swiftdrop";
 const WRITE_PRESSURE_BYTES = 96 << 20;
 const MAX_OPEN_HANDLES = 48;
@@ -145,6 +156,7 @@ export class TransferStore {
   private pendingWriteBytes = 0;
   private readonly m = { requests: 0, bytes: 0, recvMs: 0, hashMs: 0, writeMs: 0, filesCreated: 0, peakQueueBytes: 0 };
   private readonly writeLatency = new Reservoir(512);
+  private readonly arrivals = new Map<string, ArrivalTimes & { at: number }>();
 
   constructor(private readonly opts: StoreOptions) {}
 
@@ -160,6 +172,25 @@ export class TransferStore {
       writeLatencyP50: this.writeLatency.percentile(50),
       writeLatencyP95: this.writeLatency.percentile(95),
     };
+  }
+
+  /** Recent transfers' first-byte / first-file latency as this receiver saw it. */
+  arrivalTimes(): ArrivalTimes[] {
+    return [...this.arrivals.values()].map(({ at: _at, ...a }) => a);
+  }
+
+  /** A data request for `t` arrived (its headers did; the body follows on the socket). */
+  noteData(t: TransferRec) {
+    const a = this.arrivals.get(t.id);
+    if (a && a.createToFirstByteMs === null) {
+      a.createToFirstByteMs = Math.round(performance.now() - a.at);
+      this.opts.log.info(`transfer ${t.id} first bytes at +${a.createToFirstByteMs} ms after create`);
+    }
+  }
+
+  private noteFileDone(t: TransferRec) {
+    const a = this.arrivals.get(t.id);
+    if (a && a.createToFirstFileMs === null) a.createToFirstFileMs = Math.round(performance.now() - a.at);
   }
 
   /** Time the route spent pulling a body off the socket. */
@@ -263,6 +294,8 @@ export class TransferStore {
       dirty: true,
     };
     this.transfers.set(t.id, t);
+    this.arrivals.set(t.id, { transferId: t.id, files: files.length, bytes: bytesTotal, createToFirstByteMs: null, createToFirstFileMs: null, at: performance.now() });
+    if (this.arrivals.size > 10) this.arrivals.delete(this.arrivals.keys().next().value!);
     await this.persist(t);
     this.opts.log.info(`transfer ${t.id} created: ${files.length} files, ${bytesTotal} bytes from ${device.name}`);
     return { status: this.status(t) };
@@ -396,6 +429,7 @@ export class TransferStore {
       t.bytesDone += f.size;
       t.filesDone++;
     }
+    this.noteFileDone(t);
     this.touch(t);
     await this.checkDone(t);
   }
@@ -518,6 +552,8 @@ export class TransferStore {
       dirty: true,
     };
     this.transfers.set(t.id, t);
+    this.arrivals.set(t.id, { transferId: t.id, files: files.length, bytes: bytesTotal, createToFirstByteMs: null, createToFirstFileMs: null, at: performance.now() });
+    if (this.arrivals.size > 10) this.arrivals.delete(this.arrivals.keys().next().value!);
     await this.persist(t);
     this.opts.log.info(`offer ${t.id}: ${files.length} local files, ${bytesTotal} bytes, served in place`);
     this.opts.hooks.completed(t);
@@ -600,6 +636,7 @@ export class TransferStore {
     f.state = "complete";
     f.digests = null;
     t.filesDone++;
+    this.noteFileDone(t);
     this.touch(t);
   }
 

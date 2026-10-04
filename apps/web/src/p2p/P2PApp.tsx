@@ -1,3 +1,4 @@
+import { Logo } from "../ui/Logo.tsx";
 import { describePath, pathLabel, PEER_CONTROLLER, PeerReceiver, PeerTransport, type DataChannelTransport, type IncomingOffer, type PathInfo, type PeerSession, type ReceivedTransfer } from "@swiftdrop/peer";
 import { formatBytes, formatCount } from "@swiftdrop/shared";
 import { TransferJob } from "@swiftdrop/transfer-engine";
@@ -1019,11 +1020,7 @@ function PathBadge({ path }: { path: PathInfo | null }) {
 }
 
 function BrandMark() {
-  return (
-    <span className="p2p-mark-sm" aria-hidden>
-      <Send size={13} strokeWidth={2.5} />
-    </span>
-  );
+  return <Logo size={28} />;
 }
 
 function FileGlyph({ name, type }: { name: string; type: string }) {

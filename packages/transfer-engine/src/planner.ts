@@ -1,4 +1,6 @@
 import { BATCH_MAX_FILES, BATCH_TARGET_BYTES, SMALL_FILE_MAX, type TransferStatus } from "@swiftdrop/protocol";
+
+const FIRST_BATCH_FILES = 4;
 import { Bitset } from "@swiftdrop/shared";
 
 /**
@@ -99,6 +101,8 @@ export class Planner {
     this.toComplete = this.files.filter((f) => f.state === "pending" && !f.small && f.acked.complete);
   }
 
+  private batchesIssued = 0;
+
   next(blocksPerChunk: number): WorkItem | null {
     const done = this.toComplete.shift();
     if (done) {
@@ -135,6 +139,10 @@ export class Planner {
 
   private nextBatch(blocksPerChunk: number): WorkItem | null {
     const limit = Math.min(BATCH_TARGET_BYTES, Math.max(1, blocksPerChunk) * this.blockSize);
+    // Slow start: a batch can't go out until every file in it is read, and a browser pays a
+    // few ms per file read. The first batches carry 4, 8, 16, ... files so the first bytes
+    // leave within one small read instead of after forty; full-size batches follow at once.
+    const maxFiles = Math.min(BATCH_MAX_FILES, FIRST_BATCH_FILES << Math.min(this.batchesIssued, 16));
     const picked: PlanFile[] = [];
     let bytes = 0;
     for (let k = this.smallCursor; k < this.smallOrder.length; k++) {
@@ -143,12 +151,14 @@ export class Planner {
         if (k === this.smallCursor && f.state !== "pending") this.smallCursor++;
         continue;
       }
-      if (picked.length > 0 && (bytes + f.size > limit || picked.length >= BATCH_MAX_FILES)) break;
+      if (picked.length > 0 && (bytes + f.size > limit || picked.length >= maxFiles)) break;
       f.inBatch = true;
       picked.push(f);
       bytes += f.size;
     }
-    return picked.length ? { kind: "batch", files: picked, bytes } : null;
+    if (!picked.length) return null;
+    this.batchesIssued++;
+    return { kind: "batch", files: picked, bytes };
   }
 
   /** Request succeeded. Returns files that just became complete (batches) or ready to confirm. */

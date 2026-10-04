@@ -107,6 +107,9 @@ class Planner {
     _toComplete = files.where((f) => f.state == PlanState.pending && !f.small && f.acked.complete).toList();
   }
 
+  static const _firstBatchFiles = 4;
+  var _batchesIssued = 0;
+
   WorkItem? next(int blocksPerChunk) {
     if (_toComplete.isNotEmpty) {
       final done = _toComplete.removeAt(0);
@@ -146,6 +149,10 @@ class Planner {
   WorkItem? _nextBatch(int blocksPerChunk) {
     final byChunk = (blocksPerChunk < 1 ? 1 : blocksPerChunk) * blockSize;
     final limit = batchTargetBytes < byChunk ? batchTargetBytes : byChunk;
+    // Slow start, as in the TypeScript planner: the first batches carry 4, 8, 16, ... files
+    // so the first bytes go out after one small read, not after the whole first frame.
+    final ramp = _firstBatchFiles << (_batchesIssued < 16 ? _batchesIssued : 16);
+    final maxFiles = ramp < batchMaxFiles ? ramp : batchMaxFiles;
     final picked = <PlanFile>[];
     var bytes = 0;
     for (var k = _smallCursor; k < _smallOrder.length; k++) {
@@ -154,12 +161,14 @@ class Planner {
         if (k == _smallCursor && f.state != PlanState.pending) _smallCursor++;
         continue;
       }
-      if (picked.isNotEmpty && (bytes + f.size > limit || picked.length >= batchMaxFiles)) break;
+      if (picked.isNotEmpty && (bytes + f.size > limit || picked.length >= maxFiles)) break;
       f.inBatch = true;
       picked.add(f);
       bytes += f.size;
     }
-    return picked.isEmpty ? null : BatchItem(picked, bytes);
+    if (picked.isEmpty) return null;
+    _batchesIssued++;
+    return BatchItem(picked, bytes);
   }
 
   /// Request succeeded. Returns files that just became complete (batches) or ready to confirm.

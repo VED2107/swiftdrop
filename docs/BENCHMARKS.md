@@ -67,6 +67,25 @@ For comparison, the Node engine on the same machine (`PERFORMANCE_AUDIT.md`): 44
 
 Per-file disk operations from Dart (`tool/small_files.dart`): create + write + close 798–841 files/s serial; with a flush 401–490; rename 1,745–1,943; a 1/2/4/8-isolate writer pool 472/486/493/515 (no scaling). **Open gap:** Node reaches 1,567 files/s end to end (and ~3,200 creates/s in parallel) on this disk. Next candidate: Win32 `CreateFileW`/`WriteFile` through FFI, measured before it's adopted (Phase 8).
 
+## iPhone → PC: selection → first byte (2026-10-04)
+
+`SD_TTFB_BENCH=1 npx playwright test tests/e2e/ttfb-bench.spec.ts`. Phone = Chromium with an iPhone user agent, PC = the Node receiver writing to NVMe, loopback, real UI (Send photos → picker → review sheet → Send). Connection already paired and warm. "Send" = the tap on the review sheet's Send button. **Not a real iPhone**: this is SwiftDrop's own latency; iOS's picker export and Wi-Fi are not in it.
+
+| Case | send → UI | create RTT | send → first byte out | PC: create → first byte | send → first ack | send → first file | total | phone heap |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 photo (3 MB) | 5 ms | 22 ms | 43 ms | 27 ms | 69 ms | 85 ms | 1.1 s | 26 MB |
+| 10 photos | 7 ms | 57 ms | 83 ms | 28 ms | 132 ms | 184 ms | 1.0 s | 26 MB |
+| 100 photos (300 MB) | 6 ms | 48 ms | 65 ms | 26 ms | 86 ms | 122 ms | 3.1 s | 26 MB |
+| 1 GB video | 1 ms | 14 ms | 46 ms | 38 ms | 80 ms | 4.8 s | 6.1 s | 26 MB |
+| 100 × 50 KB | 2 ms | 17 ms | 70 ms | 61 ms | 86 ms | 86 ms | 1.3 s | 26 MB |
+| 1,000 × 50 KB | 2 ms | 54 ms | 162 ms | 130 ms | 176 ms | 176 ms | 4.2 s | 26 MB |
+
+Where the time went before the change: small-file sets waited 230–330 ms for the first byte, because the first batch frame (2 MB ≈ 40 files on mobile) can't leave until every file in it is read, and Chromium pays a few ms per file read. The planner now ramps batches 4 → 8 → 16 … files (TS and Dart, vectors regenerated): 100 small files 238 → 70 ms, 1,000 small files 328 → 162 ms. Photos/video were already ~50 ms: the engine never pre-hashed, pre-copied or pre-read anything (manifest is metadata only; each 1 MiB block is read, hashed and sent in one step; the per-file root digest is checked at completion). Phone heap stays flat at 26 MB for a 1 GB video (bounded 48 MiB in-flight budget). The hashing WASM is now compiled at page load instead of on the first send.
+
+What a real iPhone adds, before the page sees any file: iOS copies each picked asset out of the Photos library into a temporary file (and downloads the original first if iCloud "Optimize Storage" is on). WebKit asks the picker for the **current** representation (original HEIC/HEVC, no transcode) when the `accept` list contains `image/*` or is empty, which both our inputs satisfy; video transcoding only applies to camera capture. A web page cannot skip or stream that export. To measure it on a device: open `http://<pc>:<port>/?debug=1` on the iPhone; the latency card shows every stage of the last send, including "Tap → picker returned".
+
+**Real-iPhone numbers: not yet measured.** Fill this in from the `?debug=1` card.
+
 ## Decisions taken from these numbers
 
 - xxh64 stays pure Dart; SHA-256 stays optional.

@@ -47,6 +47,7 @@ class EngineHost implements DeviceDirectory {
   final _transfers = _Latest<List<TransferSnapshot>>(const []);
   final _offers = _Latest<List<IncomingOffer>>(const []);
   final _history = _Latest<List<TransferRecord>>(const []);
+  final _joins = _Latest<List<BrowserJoin>>(const []);
 
   void _onEvent(String topic, Object? value) {
     switch (topic) {
@@ -65,6 +66,8 @@ class EngineHost implements DeviceDirectory {
         _offers.set(value! as List<IncomingOffer>);
       case 'history':
         _history.set(value! as List<TransferRecord>);
+      case 'joins':
+        _joins.set(value! as List<BrowserJoin>);
     }
   }
 
@@ -103,6 +106,11 @@ class EngineHost implements DeviceDirectory {
   Stream<List<TransferRecord>> records() => _history.stream;
   Future<void> remove(String transferId) => _call('removeHistory', [transferId]);
   Future<void> clear() => _call('clearHistory');
+
+  // Browser guests (phones without the app)
+  Stream<List<BrowserJoin>> joins() => _joins.stream;
+  Future<void> resolveJoin(String id, bool approve) => _call('resolveJoin', [id, approve]);
+  Future<void> rotateWebPairing() => _call('rotateWebPairing');
 
   // Settings
   Future<void> setName(String name) => _call('setName', [name]);
@@ -187,6 +195,7 @@ Future<void> _engineMain((SendPort, EngineConfig) args) async {
   rt.transfers.listen((v) => out.send(('transfers', v)));
   rt.offers.listen((v) => out.send(('offers', v)));
   rt.history.listen((v) => out.send(('history', v)));
+  rt.joins.listen((v) => out.send(('joins', v)));
   out.send(inbox.sendPort);
   // Initial state for the host.
   out.send(('endpoint', rt.endpoint));
@@ -212,6 +221,8 @@ Future<void> _engineMain((SendPort, EngineConfig) args) async {
           'setName' => rt.setName(a[0]! as String).then<Object?>((_) => null),
           'setDuplicates' => rt.setDuplicates(a[0]! as DuplicatePolicy).then<Object?>((_) => null),
           'setDownloadDir' => rt.setDownloadDir(a[0]! as String).then<Object?>((_) => null),
+          'resolveJoin' => rt.resolveJoin(a[0]! as String, a[1]! as bool).then<Object?>((_) => null),
+          'rotateWebPairing' => rt.rotateWebPairing().then<Object?>((_) => null),
           _ => Future<Object?>.error(TransportException(ErrorCode.badRequest, 'unknown $method')),
         };
       return f;

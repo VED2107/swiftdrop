@@ -21,6 +21,8 @@ import '../transport/lanes.dart';
 import '../transport/link.dart';
 import '../transport/path.dart';
 import '../util/random.dart';
+import '../web/web_auth.dart';
+import '../web/web_host.dart';
 
 /// Everything the app's transfer side does, in one pure-Dart object: the listener (with
 /// receive lanes), known devices, outgoing jobs (with send lanes), the receiver, and
@@ -39,6 +41,9 @@ class EngineConfig {
     this.lanes = 4,
     this.mobile = false,
     this.bindAddress,
+    this.webRoot,
+    this.webPort = WebHost.defaultPort,
+    this.version = '0.0.0',
   });
 
   static const defaultPort = 47800;
@@ -61,6 +66,12 @@ class EngineConfig {
 
   /// Tests bind loopback; the app binds every IPv4 interface.
   final String? bindAddress;
+
+  /// The built web client (`apps/web/dist`). Set: phones without the app (an iPhone's
+  /// Safari) can pair by QR and send/receive through it. Null: no browser access.
+  final String? webRoot;
+  final int webPort;
+  final String version;
 }
 
 class EngineRuntime {
@@ -84,6 +95,8 @@ class EngineRuntime {
   final _transfersOut = StreamController<List<TransferSnapshot>>.broadcast();
   final _offersOut = StreamController<List<IncomingOffer>>.broadcast();
   final _historyOut = StreamController<List<TransferRecord>>.broadcast();
+  final _joinsOut = StreamController<List<BrowserJoin>>.broadcast();
+  Stream<List<BrowserJoin>> get joins => _joinsOut.stream;
   Stream<List<Device>> get devices => _devicesOut.stream;
   Stream<LocalEndpoint?> get endpointStream => _endpointOut.stream;
   Stream<List<TransferSnapshot>> get transfers => _transfersOut.stream;
@@ -104,6 +117,8 @@ class EngineRuntime {
   DuplicatePolicy duplicates = DuplicatePolicy.keepBoth;
   late String downloadDir = config.downloadDir;
   late final LaneReceiver _listener;
+  WebHost? _web;
+  final _webOut = <String, _WebOutgoing>{};
   Timer? _ticker;
   bool _dirty = true;
 
@@ -131,9 +146,28 @@ class EngineRuntime {
     } on SocketException {
       _listener = await _listen(bind, 0); // preferred port taken (e.g. a second instance)
     }
-    endpoint = LocalEndpoint(deviceId: deviceId, name: name, addresses: await _localAddresses(), port: _listener.port);
-    _endpointOut.add(endpoint);
+    if (config.webRoot != null) {
+      _web = await WebHost.start(
+        auth: WebAuth(p.join(config.dataDir, 'web')),
+        webRoot: config.webRoot!,
+        version: config.version,
+        port: config.webPort,
+        address: bind,
+        delegate: WebHostDelegate(
+          receive: (op, args, body, d) => _receiver.handle(op, args, body, peerId: _syncWebDevice(d).id),
+          onJoin: (_) => _publishJoins(),
+          onDevices: _syncWebDevices,
+          onDownload: _onWebDownload,
+          folderName: () => p.basename(downloadDir),
+        ),
+      );
+      _syncWebDevices();
+    }
+    _nets = await _localAddresses();
+    _refreshEndpoint();
     _ticker = Timer.periodic(snapshotInterval, (_) => _publishTransfers());
+    // Networks come and go (hotspot dropped, Wi-Fi joined): the QR must follow them.
+    _netTimer = Timer.periodic(const Duration(seconds: 4), (_) => _pollNetworks());
     _publishDevices();
     _publishHistory();
   }
@@ -146,14 +180,46 @@ class EngineRuntime {
         onProgress: _onReceiveProgress,
         onComplete: _onReceiveComplete,
         onForget: _onReceiveForgotten,
+        // Browser guests upload with the PC server's direction (phone -> host).
+        directions: {Direction.toPeer, if (config.webRoot != null) Direction.toHost},
       ));
 
   /// This device's name as others see it.
   Future<void> setName(String value) async {
     name = _cleanName(value);
     await _writeJson(_identityFile, {'deviceId': deviceId, 'name': name});
-    endpoint = LocalEndpoint(deviceId: deviceId, name: name, addresses: endpoint?.addresses ?? const [], port: _listener.port);
+    _refreshEndpoint();
+  }
+
+  void _refreshEndpoint() {
+    endpoint = LocalEndpoint(
+      deviceId: deviceId,
+      name: name,
+      addresses: [for (final n in _nets) n.$1],
+      labels: {for (final n in _nets) n.$1: n.$2},
+      port: _listener.port,
+      web: _browserAccess(),
+    );
     _endpointOut.add(endpoint);
+  }
+
+  List<(String, String)> _nets = const [];
+  Timer? _netTimer;
+  bool _polling = false;
+
+  Future<void> _pollNetworks() async {
+    if (_polling) return;
+    _polling = true;
+    try {
+      final now = await _localAddresses();
+      final same = now.length == _nets.length && [for (var i = 0; i < now.length; i++) now[i] == _nets[i]].every((x) => x);
+      if (!same) {
+        _nets = now;
+        _refreshEndpoint();
+      }
+    } finally {
+      _polling = false;
+    }
   }
 
   Future<void> setDuplicates(DuplicatePolicy policy) async => duplicates = policy;
@@ -179,6 +245,7 @@ class EngineRuntime {
 
   Future<void> stop() async {
     _ticker?.cancel();
+    _netTimer?.cancel();
     for (final j in _jobs.values) {
       j.job.pause();
     }
@@ -187,6 +254,7 @@ class EngineRuntime {
     }
     await _receiver.flush();
     await _listener.close();
+    await _web?.close();
   }
 
   // -------------------------------------------------------------------------
@@ -251,6 +319,14 @@ class EngineRuntime {
   // receiving
 
   Future<bool> _askToAccept(IncomingManifest m) {
+    if (m.peerId != null && m.peerId!.startsWith('web:')) {
+      // A browser this device approved at pairing: its uploads go straight in, like the
+      // PC server's (the person chose the files on the phone in front of them).
+      final from = _devices[m.peerId]!;
+      _incoming[m.transferId] ??= _Incoming(m.transferId, from, m.totalBytes, m.files.length, DateTime.now(), _label(m.files.length, m.label));
+      _dirty = true;
+      return Future.value(true);
+    }
     final from = (m.peerId != null ? _devices[m.peerId] : null) ??
         Device(id: 'unknown', name: 'Unknown device', kind: DeviceKind.unknown, platform: DevicePlatform.unknown, status: DeviceStatus.connected);
     final offer = IncomingOffer(
@@ -380,6 +456,7 @@ class EngineRuntime {
   }
 
   Future<String> send(String deviceId, List<SendItem> items) async {
+    if (deviceId.startsWith('web:')) return _offerToBrowser(deviceId, items);
     var device = _devices[deviceId];
     if (device == null) throw TransportException(ErrorCode.notFound, 'unknown device');
     if (_transports[deviceId]?.connected != true) {
@@ -440,6 +517,14 @@ class EngineRuntime {
   Future<void> resume(String id) async => _jobs[id]?.job.resume();
 
   Future<void> cancel(String id) async {
+    final w = _webOut[id];
+    if (w != null) {
+      _web?.removeOffer(id);
+      w.finishedAt ??= DateTime.now();
+      w.cancelled = true;
+      _dirty = true;
+      return;
+    }
     final o = _jobs[id];
     if (o != null) return o.job.cancel();
     if (_incoming.containsKey(id)) await _receiver.forget(id);
@@ -451,6 +536,11 @@ class EngineRuntime {
     if (o != null && o.finishedAt != null) _jobs.remove(id);
     final i = _incoming[id];
     if (i != null && i.finishedAt != null) _incoming.remove(id);
+    final w = _webOut[id];
+    if (w != null && w.finishedAt != null) {
+      _webOut.remove(id);
+      _web?.removeOffer(id);
+    }
     _dirty = true;
   }
 
@@ -463,6 +553,7 @@ class EngineRuntime {
   }
 
   Future<void> forget(String id) async {
+    if (id.startsWith('web:')) _web?.forget(id.substring(4));
     _devices.remove(id);
     await _transports.remove(id)?.close();
     _saveDevices();
@@ -482,10 +573,159 @@ class EngineRuntime {
   }
 
   // -------------------------------------------------------------------------
+  // browser guests (phones without the app)
+
+  BrowserAccess? _browserAccess() {
+    final w = _web;
+    if (w == null) return null;
+    final pr = w.auth.currentPairing();
+    return BrowserAccess(port: w.port, token: pr.token, code: pr.code, expiresAt: DateTime.fromMillisecondsSinceEpoch(pr.expiresAt));
+  }
+
+  /// A fresh QR and code (the old ones stop working).
+  Future<void> rotateWebPairing() async {
+    _web?.auth.rotatePairing();
+    _refreshEndpoint();
+  }
+
+  Future<void> resolveJoin(String id, bool approve) async {
+    final w = _web;
+    if (w == null) return;
+    w.resolveJoin(id, approve);
+    _publishJoins();
+    _refreshEndpoint(); // approving spends the QR on screen
+  }
+
+  void _publishJoins() {
+    final w = _web;
+    _joinsOut.add(w == null
+        ? const []
+        : [
+            for (final j in w.auth.pendingJoins) BrowserJoin(id: j.id, deviceName: j.deviceName, viaCode: j.via == 'code', returning: j.returning),
+          ]);
+  }
+
+  Device _syncWebDevice(WebDevice d) {
+    final id = 'web:${d.id}';
+    final online = _web?.auth.isOnline(d.id) ?? false;
+    final n = d.name.toLowerCase();
+    final platform = n.contains('iphone') || n.contains('ipad')
+        ? DevicePlatform.ios
+        : (n.contains('android') ? DevicePlatform.android : DevicePlatform.web);
+    final busy = _devices[id]?.status == DeviceStatus.busy;
+    final dev = Device(
+      id: id,
+      name: d.name,
+      kind: n.contains('ipad') ? DeviceKind.tablet : DeviceKind.phone,
+      platform: platform,
+      // A browser can only receive while its page is open: closed means offline, not
+      // "available", so only devices that are really there are offered as destinations.
+      status: busy ? DeviceStatus.busy : (online ? DeviceStatus.connected : DeviceStatus.offline),
+      path: const LinkPath(kind: PathKind.local, link: LinkKind.http),
+      trusted: true,
+      lastUsed: DateTime.fromMillisecondsSinceEpoch(d.lastSeen),
+    );
+    _devices[id] = dev;
+    return dev;
+  }
+
+  void _syncWebDevices() {
+    final w = _web;
+    if (w == null) return;
+    final ids = <String>{};
+    for (final d in w.auth.devices) {
+      ids.add(_syncWebDevice(d).id);
+    }
+    _devices.removeWhere((id, _) => id.startsWith('web:') && !ids.contains(id));
+    _publishDevices();
+  }
+
+  Future<String> _offerToBrowser(String deviceId, List<SendItem> items) async {
+    final w = _web;
+    final device = _devices[deviceId];
+    if (w == null || device == null) throw TransportException(ErrorCode.notFound, 'unknown device');
+    final sources = <IoFileSource>[
+      for (final item in items) ...(item.folder ? IoFileSource.folder(item.path) : [IoFileSource(item.path)]),
+    ];
+    if (sources.isEmpty) throw TransportException(ErrorCode.badRequest, 'nothing to send');
+    final label = items.length == 1 ? p.basename(items.single.path) : _label(sources.length, '');
+    final offer = WebOffer(
+      transferId: 'of_${randomId(12)}',
+      label: label,
+      files: [
+        for (final s in sources)
+          WebOfferFile(id: s.id, name: s.name, relDir: s.relDir, size: s.size, type: s.type, path: s.path, modified: DateTime.fromMillisecondsSinceEpoch(s.lastModified)),
+      ],
+    );
+    w.addOffer(offer);
+    _webOut[offer.transferId] = _WebOutgoing(offer, device, DateTime.now());
+    _dirty = true;
+    return offer.transferId;
+  }
+
+  void _onWebDownload(WebOffer o, int sent, int total, WebDevice? who) {
+    final w = _webOut[o.transferId];
+    if (w == null) return;
+    // A ZIP and single files are different byte streams; progress follows the newest one.
+    if (sent < w.lastSent) w.lastSent = 0;
+    final delta = sent - w.lastSent;
+    if (delta > 0) w.meter.add(delta);
+    w.meter.start();
+    w.lastSent = sent;
+    w.sent = sent;
+    w.total = total;
+    if (sent >= total && w.finishedAt == null && (total >= o.totalBytes || o.files.length == 1)) {
+      w.finishedAt = DateTime.now();
+      w.meter.stop();
+      _record(TransferRecord(
+        transferId: o.transferId,
+        role: TransferRole.sending,
+        peerName: w.device.name,
+        peerKind: w.device.kind,
+        fileCount: o.files.length,
+        totalBytes: o.totalBytes,
+        startedAt: w.startedAt,
+        finishedAt: w.finishedAt!,
+        outcome: TransferOutcome.completed,
+        verified: false, // HTTP download: the browser has no block digests to check
+        averageSpeed: w.meter.average(),
+      ));
+    }
+    _dirty = true;
+  }
+
+  TransferSnapshot _webSnapshot(_WebOutgoing w) {
+    final total = w.total > 0 ? w.total : w.offer.totalBytes;
+    final speed = w.finishedAt == null ? w.meter.rate() : 0.0;
+    return TransferSnapshot(
+      transferId: w.offer.transferId,
+      role: TransferRole.sending,
+      peerId: w.device.id,
+      peerName: _devices[w.device.id]?.name ?? w.device.name,
+      peerKind: w.device.kind,
+      phase: w.cancelled
+          ? TransferPhase.cancelled
+          : (w.finishedAt != null ? TransferPhase.complete : (w.sent == 0 ? TransferPhase.awaitingAcceptance : TransferPhase.running)),
+      bytesDone: w.sent,
+      bytesTotal: total,
+      filesDone: w.finishedAt != null ? w.offer.files.length : 0,
+      filesTotal: w.offer.files.length,
+      filesVerified: 0,
+      speed: speed,
+      etaSeconds: speed > 0 ? (total - w.sent) / speed : null,
+      path: const LinkPath(kind: PathKind.local, link: LinkKind.http),
+      startedAt: w.startedAt,
+      label: w.offer.label,
+    );
+  }
+
+  // -------------------------------------------------------------------------
   // publishing
 
   void _publishTransfers() {
-    final active = _jobs.values.any((o) => o.finishedAt == null) || _incoming.values.any((i) => i.finishedAt == null);
+    final active = _jobs.values.any((o) => o.finishedAt == null) ||
+        _incoming.values.any((i) => i.finishedAt == null) ||
+        _webOut.values.any((w) => w.finishedAt == null && w.sent > 0);
     if (!_dirty && !active) return;
     _dirty = false;
     final list = <TransferSnapshot>[
@@ -493,6 +733,8 @@ class EngineRuntime {
         if (!_dismissed.contains(o.job.id)) _outgoingSnapshot(o),
       for (final i in _incoming.values)
         if (!_dismissed.contains(i.id)) _incomingSnapshot(i),
+      for (final w in _webOut.values)
+        if (!_dismissed.contains(w.offer.transferId)) _webSnapshot(w),
     ];
     list.sort((a, b) => b.startedAt.compareTo(a.startedAt));
     _transfersOut.add(list);
@@ -589,6 +831,7 @@ class EngineRuntime {
   /// Re-sends every current value (a new host just attached).
   void publishAll() {
     _endpointOut.add(endpoint);
+    _publishJoins();
     _publishDevices();
     _publishOffers();
     _publishHistory();
@@ -642,7 +885,8 @@ class EngineRuntime {
   }
 
   void _saveDevices() => _writeJson(_devicesFile, [
-        for (final d in _devices.values)
+        // Browser guests live in the web pairing store, not here.
+        for (final d in _devices.values.where((d) => !d.id.startsWith('web:')))
           {
             'id': d.id,
             'name': d.name,
@@ -713,6 +957,19 @@ class _Outgoing {
   DateTime? finishedAt;
 }
 
+class _WebOutgoing {
+  _WebOutgoing(this.offer, this.device, this.startedAt);
+  final WebOffer offer;
+  final Device device;
+  final DateTime startedAt;
+  final meter = SpeedMeter(now: () => DateTime.now().microsecondsSinceEpoch / 1000);
+  int sent = 0;
+  int lastSent = 0;
+  int total = 0;
+  DateTime? finishedAt;
+  bool cancelled = false;
+}
+
 class _Incoming {
   _Incoming(this.id, this.from, this.bytesTotal, this.files, this.startedAt, this.label);
   final String id;
@@ -750,23 +1007,45 @@ String _joinHostPort(String host, int port) => host.contains(':') ? '[$host]:$po
   throw TransportException(ErrorCode.badRequest, 'Enter an address like 192.168.1.20:47800');
 }
 
-/// Private IPv4 addresses of this machine, best first (Wi-Fi/Ethernet over virtual ones).
-Future<List<String>> _localAddresses() async {
+/// Private IPv4 addresses of this machine with their interface names, best first
+/// (Wi-Fi/Ethernet over virtual ones). Windows keeps a disconnected adapter's last address
+/// (a dropped hotspot still shows 172.20.10.x), so those adapters are skipped there.
+Future<List<(String, String)>> _localAddresses() async {
   try {
+    final down = Platform.isWindows ? await _windowsDisconnected() : const <String>{};
     final ifaces = await NetworkInterface.list(type: InternetAddressType.IPv4);
-    final scored = <(int, String)>[];
+    final scored = <(int, String, String)>[];
     for (final i in ifaces) {
+      if (down.contains(i.name.toLowerCase())) continue;
       final n = i.name.toLowerCase();
-      final virtual = n.contains('vethernet') || n.contains('virtual') || n.contains('vmware') || n.contains('docker') || n.contains('wsl') || n.contains('hyper-v');
+      var virtual = n.contains('vethernet') || n.contains('virtual') || n.contains('vmware') || n.contains('docker') || n.contains('wsl') || n.contains('hyper-v');
       for (final a in i.addresses) {
         if (a.isLoopback || !isLocalAddress(a.address) || a.address.startsWith('169.254.')) continue;
+        // VirtualBox host-only adapters are named "Ethernet N" on Windows; their range gives them away.
+        if (a.address.startsWith('192.168.56.')) virtual = true;
         final wifi = n.contains('wi-fi') || n.contains('wlan') || n.contains('wireless') || n.startsWith('en') || n.startsWith('wl');
-        scored.add(((virtual ? 2 : 0) + (wifi ? 0 : 1), a.address));
+        scored.add(((virtual ? 2 : 0) + (wifi ? 0 : 1), a.address, i.name));
       }
     }
     scored.sort((a, b) => a.$1.compareTo(b.$1));
-    return [for (final s in scored) s.$2];
+    return [for (final s in scored) (s.$2, s.$3)];
   } catch (_) {
     return const [];
+  }
+}
+
+/// Lower-cased names of adapters Windows reports as disconnected.
+Future<Set<String>> _windowsDisconnected() async {
+  try {
+    final r = await Process.run('netsh', ['interface', 'ipv4', 'show', 'interfaces']);
+    final out = <String>{};
+    for (final line in const LineSplitter().convert(r.stdout as String)) {
+      final parts = line.trim().split(RegExp(r'\s+'));
+      if (parts.length < 5 || int.tryParse(parts[0]) == null) continue;
+      if (parts[3].toLowerCase() == 'disconnected') out.add(parts.sublist(4).join(' ').toLowerCase());
+    }
+    return out;
+  } catch (_) {
+    return const {};
   }
 }

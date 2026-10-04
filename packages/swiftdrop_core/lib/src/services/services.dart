@@ -17,16 +17,48 @@ class SendItem {
 
 /// How other devices reach this one (shown on the Receive screen, encoded in the QR).
 class LocalEndpoint {
-  const LocalEndpoint({required this.deviceId, required this.name, required this.addresses, required this.port});
+  const LocalEndpoint({required this.deviceId, required this.name, required this.addresses, required this.port, this.web, this.labels = const {}});
   final String deviceId;
   final String name;
 
-  /// Private LAN addresses, best first.
+  /// Private LAN addresses of connected interfaces, best first.
   final List<String> addresses;
+
+  /// Interface name per address ("Wi-Fi", "Ethernet"), so a person can pick the network
+  /// the other device is on when this one has several.
+  final Map<String, String> labels;
   final int port;
+
+  /// Browser access for phones without the app (an iPhone's Camera opens the link).
+  final BrowserAccess? web;
 
   /// What the other device types or scans: `192.168.1.20:47800`.
   String? get primary => addresses.isEmpty ? null : '${addresses.first}:$port';
+}
+
+/// How a phone without the app pairs: scan the QR (`url`) or type the code at `manual`.
+class BrowserAccess {
+  const BrowserAccess({required this.port, required this.token, required this.code, required this.expiresAt});
+  final int port;
+  final String token;
+  final String code;
+  final DateTime expiresAt;
+
+  String url(String address) => 'http://$address:$port/#p=$token';
+  String manual(String address) => 'http://$address:$port';
+}
+
+/// A browser asking to pair; nothing is granted until this device approves.
+class BrowserJoin {
+  const BrowserJoin({required this.id, required this.deviceName, required this.viaCode, required this.returning});
+  final String id;
+  final String deviceName;
+
+  /// Typed the short code rather than scanning the QR.
+  final bool viaCode;
+
+  /// This browser was paired before (approving refreshes it).
+  final bool returning;
 }
 
 abstract interface class DeviceDirectory {

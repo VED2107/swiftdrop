@@ -152,6 +152,9 @@ export class TransferJob {
   private requests = 0;
   private prepareMs = 0;
   private startedAt = 0;
+  private hasherMs = 0;
+  private createMs = 0;
+  private firstReadAt = 0;
   private firstSendAt = 0;
   private firstAckAt = 0;
   private firstFileAt = 0;
@@ -224,6 +227,7 @@ export class TransferJob {
       const t0 = this.now();
       this.startedAt = t0;
       this.hasher = await createBlockHasher(this.opts.integrity ?? "xxh64");
+      this.hasherMs = this.now() - t0;
       const status = await this.negotiate();
       this.prepareMs = this.now() - t0;
       if (!status) return;
@@ -329,7 +333,11 @@ export class TransferJob {
   telemetry(): Telemetry {
     return {
       stages: { ...this.stages },
+      startedAt: this.startedAt,
+      hasherMs: this.hasherMs,
+      createMs: this.createMs,
       prepareMs: this.prepareMs,
+      startToFirstReadMs: this.firstReadAt ? this.firstReadAt - this.startedAt : null,
       startToFirstSendMs: this.firstSendAt ? this.firstSendAt - this.startedAt : null,
       startToFirstAckMs: this.firstAckAt ? this.firstAckAt - this.startedAt : null,
       startToFirstFileMs: this.firstFileAt ? this.firstFileAt - this.startedAt : null,
@@ -365,7 +373,9 @@ export class TransferJob {
         lastModified: Math.max(0, Math.floor(f.lastModified)),
       })),
     };
+    const c0 = this.now();
     const first = await this.transport.create(base);
+    this.createMs = this.now() - c0;
     if ("status" in first) return first.status;
     this.setState("awaiting-decision");
     const decisions = await this.opts.resolveConflicts!(first.conflicts);
@@ -467,6 +477,7 @@ export class TransferJob {
       const body = new Uint8Array(await src.blob.slice(from, to).arrayBuffer());
       const t2 = this.now();
       st.readMs += t2 - t;
+      if (!this.firstReadAt) this.firstReadAt = t2;
       const digests = hasher.hashBlocks(body, BLOCK_SIZE);
       this.storeHashes(item.file, item.start, digests);
       const hashes = bytesToBase64Url(digests);
@@ -481,6 +492,7 @@ export class TransferJob {
     const buffers = await Promise.all(item.files.map((f) => this.files[f.index]!.blob.arrayBuffer()));
     let t2 = this.now();
     st.readMs += t2 - t;
+    if (!this.firstReadAt) this.firstReadAt = t2;
     const entries = item.files.map((f, i) => ({
       id: f.id,
       size: buffers[i]!.byteLength,

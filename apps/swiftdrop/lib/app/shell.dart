@@ -9,6 +9,7 @@ import 'package:swiftdrop_core/swiftdrop_core.dart';
 
 import '../design/design.dart';
 import '../screens/receive/incoming_sheet.dart';
+import '../screens/receive/join_sheet.dart';
 import 'picking.dart';
 import 'providers.dart';
 import 'router.dart';
@@ -66,13 +67,12 @@ class AppShell extends ConsumerWidget {
 
     final Widget frame;
     if (layout.isPhone) {
-      final withDock = shell.currentIndex == 0;
       final mq = MediaQuery.of(context);
       frame = Stack(children: [
         Positioned.fill(
           child: MediaQuery(
-            data: mq.copyWith(padding: mq.padding.copyWith(bottom: phoneChromeHeight(context, withDock: withDock))),
-            child: shell,
+            data: mq.copyWith(padding: mq.padding.copyWith(bottom: phoneChromeHeight(context, withDock: false))),
+            child: _TabSwitch(index: shell.currentIndex, child: shell),
           ),
         ),
         Positioned(
@@ -83,7 +83,6 @@ class AppShell extends ConsumerWidget {
             destinations: destinations,
             selected: shell.currentIndex,
             onSelect: _go,
-            dock: withDock ? const HomeActions(inDock: true) : null,
           ),
         ),
       ]);
@@ -95,14 +94,62 @@ class AppShell extends ConsumerWidget {
             destinations: destinations,
             selected: shell.currentIndex,
             onSelect: _go,
-            header: Text('SwiftDrop', style: context.sdText.title),
+            header: Row(children: [const SwiftMark(size: 30), const SizedBox(width: SdSpace.s3), Text('SwiftDrop', style: context.sdText.title)]),
             footer: const _SidebarFooter(),
           ),
         ),
-        Expanded(child: shell),
+        Expanded(child: _TabSwitch(index: shell.currentIndex, child: shell)),
       ]);
     }
     return CallbackShortcuts(bindings: shortcuts, child: Focus(autofocus: true, child: frame));
+  }
+}
+
+/// Section change: the new section fades up 8 pt in 220 ms (ease-out), so the eye reads it
+/// as "somewhere else" without a slide that implies direction. The section tree is never
+/// rebuilt (each keeps its scroll position). Keyboard switches (Ctrl 1-4) skip it.
+class _TabSwitch extends StatefulWidget {
+  const _TabSwitch({required this.index, required this.child});
+  final int index;
+  final Widget child;
+
+  @override
+  State<_TabSwitch> createState() => _TabSwitchState();
+}
+
+class _TabSwitchState extends State<_TabSwitch> with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(vsync: this, duration: SdMotion.small, value: 1);
+
+  @override
+  void didUpdateWidget(_TabSwitch old) {
+    super.didUpdateWidget(old);
+    if (old.index == widget.index) return;
+    final keyboard = HardwareKeyboard.instance.isControlPressed || HardwareKeyboard.instance.isMetaPressed;
+    if (keyboard) return;
+    _c.duration = SdAppearance.of(context).reduceMotion ? SdMotion.reduced : SdMotion.small;
+    _c.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final curve = CurvedAnimation(parent: _c, curve: SdMotion.easeOut);
+    final reduce = SdAppearance.of(context).reduceMotion;
+    return FadeTransition(
+      opacity: Tween(begin: 0.0, end: 1.0).animate(curve),
+      child: reduce
+          ? widget.child
+          : AnimatedBuilder(
+              animation: curve,
+              builder: (_, child) => Transform.translate(offset: Offset(0, 8 * (1 - curve.value)), child: child),
+              child: widget.child,
+            ),
+    );
   }
 }
 
@@ -149,6 +196,7 @@ class GlobalLayer extends ConsumerStatefulWidget {
 class _GlobalLayerState extends ConsumerState<GlobalLayer> {
   bool _dragging = false;
   final _shown = <String>{};
+  bool _primed = false;
 
   BuildContext? get _nav => rootNavigatorKey.currentContext;
 
@@ -167,11 +215,47 @@ class _GlobalLayerState extends ConsumerState<GlobalLayer> {
     showGlassSheet<void>(nav, dismissible: false, semanticLabel: 'Incoming transfer', builder: (_) => IncomingSheet(offer: offer));
   }
 
+  void _showJoin(BrowserJoin join) {
+    final nav = _nav;
+    if (nav == null || !_shown.add('join:${join.id}')) return;
+    showGlassSheet<void>(nav, dismissible: false, semanticLabel: 'Phone wants to connect', builder: (_) => JoinSheet(join: join));
+  }
+
+  /// A transfer that arrives without a question (an iPhone uploading through the browser
+  /// page) opens its live screen, so this device shows what it's receiving the moment
+  /// bytes move. Own sends and accepted offers navigate by themselves; transfers already
+  /// running when the app started don't pop up.
+  void _onTransfers(List<TransferSnapshot> list) {
+    if (!_primed) {
+      _primed = true;
+      _shown.addAll(list.map((t) => 'tr:${t.transferId}'));
+      return;
+    }
+    for (final t in list) {
+      if (t.role != TransferRole.receiving || t.phase.isFinished || t.phase == TransferPhase.awaitingAcceptance) continue;
+      if (!_shown.add('tr:${t.transferId}') || _shown.contains(t.transferId)) continue;
+      final nav = _nav;
+      if (nav == null || !nav.mounted) continue;
+      final router = GoRouter.of(nav);
+      if (router.routerDelegate.currentConfiguration.uri.path == Routes.transfer(t.transferId)) continue;
+      router.push(Routes.transfer(t.transferId));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen(transfersProvider, (_, next) {
+      final list = next.value;
+      if (list != null) _onTransfers(list);
+    });
     ref.listen(incomingProvider, (_, next) {
       for (final o in next.value ?? const <IncomingOffer>[]) {
         _showOffer(o);
+      }
+    });
+    ref.listen(browserJoinsProvider, (_, next) {
+      for (final j in next.value ?? const <BrowserJoin>[]) {
+        _showJoin(j);
       }
     });
     Widget child = widget.child;

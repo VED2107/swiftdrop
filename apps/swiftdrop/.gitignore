@@ -46,3 +46,8 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+/assets/web/*
+!/assets/web/.gitkeep
+!/assets/web/assets/
+/assets/web/assets/*
+!/assets/web/assets/.gitkeep

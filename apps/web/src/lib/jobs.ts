@@ -7,6 +7,7 @@ import {
   TransferQueue,
   type ConflictDecision,
 } from "@swiftdrop/transfer-engine";
+import { createBlockHasher } from "@swiftdrop/crypto";
 import { getToken } from "./api.ts";
 import { isIOS, isMobile, storage } from "./env.ts";
 import { describe, fingerprint, toSources, type Picked } from "./files.ts";
@@ -14,8 +15,13 @@ import { onRtt } from "./socket.ts";
 import { addRecent } from "./recent.ts";
 import { kindOf } from "./files.ts";
 import { app } from "./store.ts";
+import { trackSend } from "./latency.ts";
 
 export const queue = new TransferQueue();
+
+// Compile the hashing WASM now, while the person is still choosing files, so the first
+// send doesn't pay for it. The engine reuses the cached instance.
+void createBlockHasher("xxh64").catch(() => undefined);
 
 // ---------------------------------------------------------------------------
 // Resume records. A page reload loses File objects (browsers never persist them),
@@ -112,6 +118,7 @@ export function send(picked: Picked[], direction: Direction): TransferJob | null
       if (avg > 0 && j.bytesTotal > 50e6) storage.set("sd.lastSpeed", avg);
     }
   });
+  trackSend(job);
   queue.add(job);
   return job;
 }

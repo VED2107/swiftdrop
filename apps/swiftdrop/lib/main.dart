@@ -11,6 +11,10 @@ import 'package:swiftdrop_core/testing.dart';
 import 'app/app.dart';
 import 'app/providers.dart';
 import 'app/settings.dart';
+import 'app/web_assets.dart';
+
+/// Shown to browser guests (`/api/info`) and in About.
+const appVersion = String.fromEnvironment('SWIFTDROP_VERSION', defaultValue: '0.3.0');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +31,8 @@ Future<void> main() async {
   Object? engineError;
   if (!demoMode) {
     final downloads = settings.downloadDir ?? await _defaultDownloads(profile);
+    // Phones without the app (an iPhone) pair by QR and use the bundled browser client.
+    final webRoot = await extractWebClient(support.path).catchError((Object _) => null);
     try {
       engine = await EngineHost.spawn(EngineConfig(
         dataDir: p.join(support.path, 'engine'),
@@ -36,6 +42,8 @@ Future<void> main() async {
         platform: _platform(),
         mobile: Platform.isAndroid || Platform.isIOS,
         lanes: Platform.isAndroid || Platform.isIOS ? 2 : 4,
+        webRoot: webRoot,
+        version: appVersion,
       ));
       await engine.setDuplicates(settings.duplicates);
     } catch (e) {

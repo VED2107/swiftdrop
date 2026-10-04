@@ -2,7 +2,7 @@ import { formatBytes, formatCount } from "@swiftdrop/shared";
 import { humanEta } from "../lib/recent.ts";
 import { ArrowRight, Check, FileArchive, FileAudio, FileText, File as FileIcon, Film, ImageIcon } from "lucide-react";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { storage } from "../lib/env.ts";
+import { isIOS, storage } from "../lib/env.ts";
 import { kindOf, type Kind, type Picked } from "../lib/files.ts";
 
 interface Props {
@@ -63,6 +63,13 @@ export function SelectionSheet({ picked, target, onSend, onClose }: Props) {
   }, [picked, selected]);
 
   const lastSpeed = storage.get<number>("sd.lastSpeed");
+  // iPhone videos are recorded as .MOV (HEVC). The photo picker in "Most Compatible" mode
+  // re-encodes them to H.264 .mp4 before Safari gets them, which is the long "Preparing"
+  // wait on big clips. Seeing .mp4 from an iPhone picker means that just happened.
+  const converted = useMemo(
+    () => isIOS && picked.some((p) => /\.mp4$/i.test(p.file.name) && p.file.type.startsWith("video/")),
+    [picked],
+  );
   const toggle = (i: number) => {
     selected[i] = selected[i] ? 0 : 1;
     setSelected(selected.slice());
@@ -95,6 +102,12 @@ export function SelectionSheet({ picked, target, onSend, onClose }: Props) {
             </button>
           </div>
         </div>
+
+        {converted && (
+          <p className="convert-note mx-6 mb-3" role="note">
+            iOS converted these videos before handing them over, which is why the picker took a while. Next time, tap <b>Options</b> at the top of the photo picker and choose <b>Current</b>: videos come as originals and start sending right away.
+          </p>
+        )}
 
         <div ref={scroller} className="grow overflow-y-auto px-6 overscroll-contain" style={{ contain: "strict" }}>
           <div style={{ height: rows * rowH, position: "relative" }}>

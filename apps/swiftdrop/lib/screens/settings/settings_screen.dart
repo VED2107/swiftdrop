@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -72,12 +71,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onChanged: settings.setDuplicates,
               ),
             ),
-            const SettingsRow(
-              title: 'Accept automatically',
-              icon: SdIcons.receive,
-              detail: 'Every transfer asks first. Automatic acceptance for your own devices arrives with secure pairing.',
-              trailing: GlassSwitch(value: false, onChanged: null, label: 'Accept automatically'),
-            ),
           ],
         ),
         SettingsGroup(
@@ -103,16 +96,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           title: 'Appearance',
           children: [
             SettingsRow(
-              title: 'Glass',
-              detail: 'Subtle drops the background blur; Off uses solid surfaces.',
-              below: SegmentedGlass<GlassMode>(
-                label: 'Glass',
-                value: prefs.glass,
-                options: const {GlassMode.full: 'Full', GlassMode.subtle: 'Subtle', GlassMode.off: 'Off'},
-                onChanged: settings.setGlass,
-              ),
-            ),
-            SettingsRow(
               title: 'Motion',
               detail: 'Reduced keeps fades and drops movement. System follows your device.',
               below: SegmentedGlass<MotionPreference>(
@@ -124,7 +107,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             SettingsRow(
               title: 'High contrast',
-              detail: 'Solid surfaces and no blur. On automatically when your device asks for it.',
+              detail: 'Stronger edges and text. On automatically when your device asks for it.',
               below: SegmentedGlass<ContrastPreference>(
                 label: 'High contrast',
                 value: prefs.contrast,
@@ -165,7 +148,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           children: [
             const SettingsRow(title: 'SwiftDrop', detail: 'Version 0.3.0 (preview)'),
             SettingsRow(title: 'Open-source licenses', onTap: () => showLicensePage(context: context, applicationName: 'SwiftDrop')),
-            if (kDebugMode) SettingsRow(title: 'Design gallery', onTap: () => context.push(Routes.gallery)),
           ],
         ),
       ],

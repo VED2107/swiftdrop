@@ -14,6 +14,7 @@ export 'src/util/sanitize.dart';
 export 'src/engine/job.dart';
 export 'src/engine/receiver.dart';
 export 'src/io/io_files.dart';
+export 'src/io/publishing_sink.dart';
 export 'src/transport/frames.dart';
 export 'src/transport/memory_link.dart';
 export 'src/transport/path.dart';

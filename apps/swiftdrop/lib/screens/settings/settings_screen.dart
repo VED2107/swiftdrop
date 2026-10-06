@@ -33,6 +33,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  /// Runs a storage change; the engine refuses while a transfer is arriving.
+  Future<void> _storage(Future<Object?> Function() change) async {
+    try {
+      await change();
+      if (mounted) setState(() => _folderError = null);
+    } on TransportException {
+      if (mounted) setState(() => _folderError = 'Finish or cancel the transfer that’s arriving, then change where files are saved.');
+    } catch (_) {
+      if (mounted) setState(() => _folderError = 'Couldn’t use that folder. Pick another one.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final prefs = ref.watch(settingsProvider);
@@ -49,6 +61,40 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           title: 'Transfer',
           footer: _folderError,
           children: [
+            if (Platform.isAndroid) ...[
+              SettingsRow(
+                title: 'Photos, videos and music',
+                icon: SdIcons.folder,
+                detail: prefs.mediaToGallery
+                    ? 'Saved to your Gallery and Music, so they show up in Photos right away.'
+                    : 'Saved with your other files.',
+                trailing: GlassSwitch(
+                  value: prefs.mediaToGallery,
+                  onChanged: (v) => _storage(() => settings.setMediaToGallery(v)),
+                  label: 'Save photos, videos and music to the Gallery',
+                ),
+              ),
+              SettingsRow(
+                title: prefs.mediaToGallery ? 'Other files' : 'Save received files to',
+                icon: SdIcons.folder,
+                detail: prefs.saveTreeName ?? 'Downloads/SwiftDrop',
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  if (prefs.saveTreeUri != null || !prefs.mediaToGallery)
+                    GlassButton(
+                      label: 'Reset',
+                      kind: GlassButtonKind.quiet,
+                      compact: true,
+                      onPressed: () => _storage(settings.resetSaveLocation),
+                    ),
+                  GlassButton(
+                    label: prefs.saveTreeUri == null ? 'Choose folder' : 'Change folder',
+                    kind: GlassButtonKind.secondary,
+                    compact: true,
+                    onPressed: () => _storage(settings.chooseSaveFolder),
+                  ),
+                ]),
+              ),
+            ] else
             SettingsRow(
               title: 'Save received files to',
               icon: SdIcons.folder,
@@ -89,6 +135,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     },
             ),
             SettingsRow(title: 'Address', icon: SdIcons.local, detail: ep?.primary ?? 'Not on a network'),
+            if (engine != null)
+              SettingsRow(
+                title: 'Network details',
+                icon: SdIcons.local,
+                detail: 'Which networks this device offers, and how it is connected. Useful when a hotspot won’t pair.',
+                onTap: () async {
+                  final text = await engine.diagnostics();
+                  if (context.mounted) await showNetworkDetails(context, text);
+                },
+              ),
             SettingsRow(title: 'Connect a device', icon: SdIcons.connect, onTap: () => context.push(Routes.pair)),
           ],
         ),
@@ -154,3 +210,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 }
+
+
+Future<void> showNetworkDetails(BuildContext context, String text) => showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Network details'),
+        content: SingleChildScrollView(child: SelectableText(text, style: context.sdText.caption)),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ),
+    );

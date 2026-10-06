@@ -103,6 +103,8 @@ class TransferSnapshot {
     required this.startedAt,
     this.label = '',
     this.location,
+    this.savedMedia = 0,
+    this.savedOther = 0,
   });
 
   final String transferId;
@@ -131,6 +133,11 @@ class TransferSnapshot {
 
   /// Receiving side: the folder the files land in.
   final String? location;
+
+  /// Receiving on a phone: files saved to the media library (Gallery / Music) and files
+  /// saved to a folder, so the finished screen can offer the right "open" action.
+  final int savedMedia;
+  final int savedOther;
 
   double get fraction => bytesTotal == 0 ? (phase == TransferPhase.complete ? 1 : 0) : bytesDone / bytesTotal;
   bool get verified => phase == TransferPhase.complete && filesVerified == filesTotal;
@@ -177,6 +184,8 @@ class TransferRecord {
     required this.verified,
     this.averageSpeed,
     this.location,
+    this.savedMedia = 0,
+    this.savedOther = 0,
   });
 
   final String transferId;
@@ -195,6 +204,8 @@ class TransferRecord {
 
   /// Where received files were saved (folder path or platform location), for "Show".
   final String? location;
+  final int savedMedia;
+  final int savedOther;
 
   Duration get duration => finishedAt.difference(startedAt);
 }

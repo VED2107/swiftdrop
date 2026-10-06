@@ -70,6 +70,10 @@ abstract interface class DeviceDirectory {
 
   /// Connects to a device by address (`host:port`), remembers it, returns it.
   Future<Device> connect(String address);
+
+  /// Connects to a device known by several addresses (every network its QR listed): the
+  /// first that answers, and answers as [deviceId] when given, wins.
+  Future<Device> connectAny(List<String> addresses, {String? deviceId});
   Future<void> rename(String deviceId, String name);
 
   /// Removes it from known devices (and trust, once pairing exists).

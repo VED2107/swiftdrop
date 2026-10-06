@@ -84,9 +84,9 @@ class _PairScreenState extends ConsumerState<PairScreen> {
 
   /// Scanned receiver QR, already validated by [readScannedCode].
   Future<bool> _connectScanned(ScannedCode code) =>
-      _dial(code.address!, peerName: code.name);
+      _dial(code.address!, peerName: code.name, alternates: code.alternates, deviceId: code.deviceId);
 
-  Future<bool> _dial(String addr, {String? peerName}) async {
+  Future<bool> _dial(String addr, {String? peerName, List<String> alternates = const [], String? deviceId}) async {
     setState(() {
       _connecting = true;
       _connectingTo = peerName;
@@ -94,9 +94,10 @@ class _PairScreenState extends ConsumerState<PairScreen> {
     });
     debugPrint('[PAIR] role=sender dialing peer=${_redact(addr)}');
     try {
-      final d = await ref
-          .read(deviceDirectoryProvider)
-          .connect(addr)
+      final directory = ref.read(deviceDirectoryProvider);
+      final d = await (alternates.isEmpty
+              ? directory.connect(addr)
+              : directory.connectAny([addr, ...alternates], deviceId: deviceId))
           .timeout(_connectTimeout);
       if (mounted) setState(() => _found = d);
       HapticFeedback.mediumImpact();

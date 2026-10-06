@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:swiftdrop_core/swiftdrop_core.dart';
 
 import '../../app/picking.dart';
+import '../../app/platform.dart';
 import '../../app/providers.dart';
 import '../../app/router.dart';
 import '../../app/shell.dart';
@@ -266,7 +267,9 @@ class _Complete extends ConsumerWidget {
           Center(child: Text('Completed in ${_took(record.finishedAt.difference(record.startedAt))}', style: t.caption)),
         ],
         const SizedBox(height: SdSpace.s8),
-        if (receiving && s.location != null && !(Platform.isAndroid || Platform.isIOS)) ...[
+        if (receiving && Platform.isAndroid && s.savedMedia + s.savedOther > 0)
+          _SavedActions(s: s, onDone: onDone)
+        else if (receiving && s.location != null && !(Platform.isAndroid || Platform.isIOS)) ...[
           PrimaryAction(label: 'View files', icon: SdIcons.openFolder, expand: true, onPressed: () => revealFolder(s.location!)),
           const SizedBox(height: SdSpace.s2),
           SecondaryAction(label: 'Done', expand: true, onPressed: onDone),
@@ -325,6 +328,91 @@ class _Gone extends ConsumerWidget {
         ),
         const SizedBox(height: SdSpace.s4),
         SecondaryAction(label: 'Done', expand: true, onPressed: onDone),
+      ],
+    );
+  }
+}
+
+
+/// Android, after receiving: says where the files went and offers only the "open" actions
+/// this phone can really perform (a Gallery app, a file manager that opens the folder).
+class _SavedActions extends ConsumerStatefulWidget {
+  const _SavedActions({required this.s, required this.onDone});
+  final TransferSnapshot s;
+  final VoidCallback onDone;
+
+  @override
+  ConsumerState<_SavedActions> createState() => _SavedActionsState();
+}
+
+class _SavedActionsState extends ConsumerState<_SavedActions> {
+  late final Future<(bool, bool)> _can;
+
+  @override
+  void initState() {
+    super.initState();
+    final prefs = ref.read(settingsProvider);
+    _can = () async {
+      final gallery = widget.s.savedMedia > 0 && await PlatformLink.canOpen('gallery');
+      final folder = widget.s.savedOther > 0 &&
+          (prefs.saveTreeUri != null ? await PlatformLink.canOpen('folder', uri: prefs.saveTreeUri) : await PlatformLink.canOpen('downloads'));
+      return (gallery, folder);
+    }();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.sdText;
+    final prefs = ref.watch(settingsProvider);
+    final where = saveSummary(prefs);
+    final s = widget.s;
+    final saved = [
+      if (s.savedMedia > 0) 'Photos, videos and music are in your ${where.media == 'Gallery' ? 'Gallery' : where.media}',
+      if (s.savedOther > 0) 'Files are in ${where.other}',
+    ].join('. ');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(child: Text('$saved.', style: t.caption, textAlign: TextAlign.center)),
+        const SizedBox(height: SdSpace.s4),
+        FutureBuilder<(bool, bool)>(
+          future: _can,
+          builder: (context, snap) {
+            final (gallery, folder) = snap.data ?? (false, false);
+            final folderAction = prefs.saveTreeUri != null ? ('folder', prefs.saveTreeUri) : ('downloads', null);
+            final first = gallery
+                ? PrimaryAction(
+                    label: s.savedOther > 0 ? 'View photos and videos' : 'View in Gallery',
+                    icon: SdIcons.openFolder,
+                    expand: true,
+                    onPressed: () => PlatformLink.open('gallery'),
+                  )
+                : (folder
+                    ? PrimaryAction(
+                        label: 'Open folder',
+                        icon: SdIcons.openFolder,
+                        expand: true,
+                        onPressed: () => PlatformLink.open(folderAction.$1, uri: folderAction.$2),
+                      )
+                    : null);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ?first,
+                if (gallery && folder) ...[
+                  const SizedBox(height: SdSpace.s2),
+                  SecondaryAction(
+                    label: 'Open folder',
+                    expand: true,
+                    onPressed: () => PlatformLink.open(folderAction.$1, uri: folderAction.$2),
+                  ),
+                ],
+                const SizedBox(height: SdSpace.s2),
+                first == null ? PrimaryAction(label: 'Done', expand: true, onPressed: widget.onDone) : SecondaryAction(label: 'Done', expand: true, onPressed: widget.onDone),
+              ],
+            );
+          },
+        ),
       ],
     );
   }

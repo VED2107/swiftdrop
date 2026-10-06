@@ -20,6 +20,9 @@ class IdleDeviceDirectory implements DeviceDirectory {
   Future<Device> connect(String address) => Future.error(TransportException(ErrorCode.network, 'no transport available'));
 
   @override
+  Future<Device> connectAny(List<String> addresses, {String? deviceId}) => connect('');
+
+  @override
   Future<void> rename(String deviceId, String name) async {}
 
   @override

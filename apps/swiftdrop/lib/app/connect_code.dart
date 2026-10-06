@@ -11,12 +11,16 @@ import 'package:swiftdrop_core/swiftdrop_core.dart';
 String connectUri(LocalEndpoint e, {String? address}) {
   final host = address ?? (e.addresses.isEmpty ? null : e.addresses.first);
   final appAddress = host == null ? (e.primary ?? '') : '$host:${e.port}';
+  // Every other network this device is on (hotspot and Wi-Fi at once, Ethernet): the
+  // scanner tries them all, so the one address that happens to be first can't break pairing.
+  final others = [for (final a in e.addresses) if (a != host) a].take(maxAlternates).join(',');
   final web = e.web;
   if (web != null && host != null) {
     final extra = Uri(
       queryParameters: {
         'v': '$connectCodeVersion',
         'a': appAddress,
+        if (others.isNotEmpty) 'l': others,
         'n': e.name,
         'd': e.deviceId,
       },
@@ -26,6 +30,7 @@ String connectUri(LocalEndpoint e, {String? address}) {
   final q = {
     'v': '$connectCodeVersion',
     'a': appAddress,
+    if (others.isNotEmpty) 'l': others,
     'n': e.name,
     'd': e.deviceId,
   };
@@ -35,6 +40,10 @@ String connectUri(LocalEndpoint e, {String? address}) {
     queryParameters: q,
   ).toString();
 }
+
+/// Extra addresses a code carries beside the main one (`l`, comma-separated hosts on the
+/// same port). Old apps ignore the field; new apps race all of them.
+const maxAlternates = 3;
 
 /// Highest connection-code version this build understands (`v` in the QR).
 const connectCodeVersion = 1;
@@ -52,14 +61,25 @@ enum ScanProblem {
 
 /// What a scanned QR asks for: an app address to connect to, or why it can't be used.
 class ScannedCode {
-  const ScannedCode.ok(String this.address, {this.name}) : problem = null;
+  const ScannedCode.ok(String this.address, {this.name, this.alternates = const [], this.deviceId}) : problem = null;
   const ScannedCode.bad(ScanProblem this.problem)
       : address = null,
-        name = null;
+        name = null,
+        alternates = const [],
+        deviceId = null;
 
   final String? address;
   final String? name;
+
+  /// The same device's other addresses (`host:port`), tried alongside [address].
+  final List<String> alternates;
+
+  /// The device id the code promises; a different device answering is refused.
+  final String? deviceId;
   final ScanProblem? problem;
+
+  /// [address] first, then the alternates.
+  List<String> get allAddresses => [?address, ...alternates];
 }
 
 final _hostPort = RegExp(r'^(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9.\-]+)(:\d{1,5})?$');
@@ -95,7 +115,13 @@ ScannedCode readScannedCode(String raw) {
     return const ScannedCode.bad(ScanProblem.notSwiftDrop);
   }
   final n = params['n'];
-  return ScannedCode.ok(a, name: n == null || n.isEmpty ? null : n);
+  final port = RegExp(r':(\d{1,5})$').firstMatch(a)?.group(1);
+  final alternates = <String>[
+    for (final h in (params['l'] ?? '').split(','))
+      if (port != null && h.trim().isNotEmpty && _hostPort.hasMatch(h.trim()) && !h.contains(':') && '${h.trim()}:$port' != a) '${h.trim()}:$port',
+  ].take(maxAlternates).toList();
+  final d = params['d'];
+  return ScannedCode.ok(a, name: n == null || n.isEmpty ? null : n, alternates: alternates, deviceId: d == null || d.isEmpty ? null : d);
 }
 
 /// Accepts `192.168.1.20:47800`, `192.168.1.20` (default port), a `swiftdrop://connect`

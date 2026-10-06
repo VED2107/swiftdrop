@@ -4,6 +4,7 @@ import 'package:swiftdrop_core/swiftdrop_core.dart';
 
 import '../design/design.dart';
 import 'picking.dart';
+import 'platform.dart';
 import 'settings.dart';
 
 /// Application state. Riverpod wires the engine's services to widgets and holds UI-level
@@ -63,7 +64,36 @@ class SettingsController extends Notifier<AppSettings> {
     _set(state.copyWith(duplicates: v));
   }
 
+  /// Android: photos, videos and music to the Gallery, or with everything else.
   /// Throws when the engine refuses (something is being received right now).
+  Future<void> setMediaToGallery(bool v) async {
+    final next = state.copyWith(mediaToGallery: v);
+    await ref.read(engineProvider)?.setDestination(next.destination);
+    _set(next);
+  }
+
+  /// Android: opens the system folder picker once; the choice is remembered. Returns false
+  /// when the person backed out. Throws when the engine refuses (receiving right now).
+  Future<bool> chooseSaveFolder() async {
+    final picked = await PlatformLink.pickFolder();
+    if (picked == null) return false;
+    final next = state.copyWith(saveTreeUri: picked.uri, saveTreeName: picked.name);
+    await ref.read(engineProvider)?.setDestination(next.destination);
+    final old = state.saveTreeUri;
+    _set(next);
+    if (old != null && old != picked.uri) await PlatformLink.releaseFolder(old);
+    return true;
+  }
+
+  /// Back to Gallery + Downloads/SwiftDrop.
+  Future<void> resetSaveLocation() async {
+    final old = state.saveTreeUri;
+    final next = state.copyWith(mediaToGallery: true, clearSaveTree: true);
+    await ref.read(engineProvider)?.setDestination(next.destination);
+    _set(next);
+    if (old != null) await PlatformLink.releaseFolder(old);
+  }
+
   Future<void> setDownloadDir(String dir) async {
     await ref.read(engineProvider)?.setDownloadDir(dir);
     _set(state.copyWith(downloadDir: dir));
@@ -74,6 +104,13 @@ final settingsProvider = NotifierProvider<SettingsController, AppSettings>(Setti
 
 /// The folder received files go to (resolved at startup; changes with the setting).
 final downloadDirProvider = Provider<String?>((ref) => ref.watch(settingsProvider).downloadDir);
+
+/// What a person reads about where files go on a phone: Gallery for media, a folder for the
+/// rest. No Android storage terms.
+({String media, String other}) saveSummary(AppSettings s) => (
+      media: s.mediaToGallery ? 'Gallery' : (s.saveTreeName ?? 'Downloads/SwiftDrop'),
+      other: s.saveTreeName ?? 'Downloads/SwiftDrop',
+    );
 
 // ---------------------------------------------------------------------------
 // Environment: what the background expresses, derived from real state only.

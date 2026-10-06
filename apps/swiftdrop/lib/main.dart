@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -9,6 +10,7 @@ import 'package:swiftdrop_core/swiftdrop_core.dart';
 import 'package:swiftdrop_core/testing.dart';
 
 import 'app/app.dart';
+import 'app/platform.dart';
 import 'app/providers.dart';
 import 'app/settings.dart';
 import 'app/web_assets.dart';
@@ -30,12 +32,21 @@ Future<void> main() async {
       : Directory(p.join(base.path, 'profiles', profile));
   await support.create(recursive: true);
   final settingsFile = SettingsFile(p.join(support.path, 'settings.json'));
-  final settings = settingsFile.load();
+  var settings = settingsFile.load();
 
   EngineHost? engine;
   Object? engineError;
   if (!demoMode) {
-    final downloads = settings.downloadDir ?? await _defaultDownloads(profile);
+    // Android: files are received into private staging, then published to the Gallery or the
+    // chosen folder. The chosen folder's grant can disappear (revoked, storage removed).
+    final bridge = PlatformLink.start(onNetworkChanged: () => engine?.networkChanged().ignore());
+    if (bridge != null && settings.saveTreeUri != null && !await PlatformLink.folderGranted(settings.saveTreeUri!)) {
+      settings = settings.copyWith(clearSaveTree: true);
+      settingsFile.save(settings);
+    }
+    final downloads = bridge != null
+        ? p.join(support.path, 'staging')
+        : (settings.downloadDir ?? await _defaultDownloads(profile));
     // Phones without the app (an iPhone) pair by QR and use the bundled browser client.
     final webRoot = await extractWebClient(support.path)
         .catchError((Object _) => null);
@@ -51,6 +62,10 @@ Future<void> main() async {
           lanes: Platform.isAndroid || Platform.isIOS ? 2 : 4,
           webRoot: webRoot,
           version: appVersion,
+          bridge: bridge?.sendPort,
+          stagingDir: bridge == null ? null : downloads,
+          destination: settings.destination,
+          debugNet: kDebugMode || const bool.fromEnvironment('SWIFTDROP_NETLOG'),
         ),
       );
       await engine.setDuplicates(settings.duplicates);
@@ -58,7 +73,7 @@ Future<void> main() async {
       engineError = e;
       debugPrint('SwiftDrop engine failed to start: $e');
     }
-    if (settings.downloadDir == null) {
+    if (bridge == null && settings.downloadDir == null) {
       settingsFile.save(settings.copyWith(downloadDir: downloads));
     }
   }

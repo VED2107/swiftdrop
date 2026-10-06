@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:isolate';
 
+import '../platform/destination.dart';
 import '../platform/files.dart';
 import '../protocol/errors.dart';
 import '../services/models.dart';
@@ -87,6 +88,8 @@ class EngineHost implements DeviceDirectory {
   @override
   Future<Device> connect(String address) => _call('connect', [address]);
   @override
+  Future<Device> connectAny(List<String> addresses, {String? deviceId}) => _call('connectAny', [addresses, deviceId]);
+  @override
   Future<void> rename(String deviceId, String name) => _call('rename', [deviceId, name]);
   @override
   Future<void> forget(String deviceId) => _call('forget', [deviceId]);
@@ -116,6 +119,9 @@ class EngineHost implements DeviceDirectory {
   Future<void> setName(String name) => _call('setName', [name]);
   Future<void> setDuplicates(DuplicatePolicy policy) => _call('setDuplicates', [policy]);
   Future<void> setDownloadDir(String dir) => _call('setDownloadDir', [dir]);
+  Future<void> networkChanged() => _call('networkChanged');
+  Future<String> diagnostics() => _call('diagnostics');
+  Future<void> setDestination(SaveDestination d) => _call('setDestination', [d]);
 
   /// Views with the right `watch()` for each interface.
   late final TransferService transferService = _TransferView(this);
@@ -220,6 +226,10 @@ Future<void> _engineMain((SendPort, EngineConfig) args) async {
           'stop' => rt.stop().then<Object?>((_) => null),
           'setName' => rt.setName(a[0]! as String).then<Object?>((_) => null),
           'setDuplicates' => rt.setDuplicates(a[0]! as DuplicatePolicy).then<Object?>((_) => null),
+          'connectAny' => rt.connectAny((a[0]! as List).cast<String>(), deviceId: a[1] as String?),
+          'networkChanged' => rt.networkChanged().then<Object?>((_) => null),
+          'diagnostics' => rt.diagnostics(),
+          'setDestination' => rt.setDestination(a[0]! as SaveDestination).then<Object?>((_) => null),
           'setDownloadDir' => rt.setDownloadDir(a[0]! as String).then<Object?>((_) => null),
           'resolveJoin' => rt.resolveJoin(a[0]! as String, a[1]! as bool).then<Object?>((_) => null),
           'rotateWebPairing' => rt.rotateWebPairing().then<Object?>((_) => null),

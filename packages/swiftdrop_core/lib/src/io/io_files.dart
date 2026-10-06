@@ -114,6 +114,18 @@ class IoSinkFactory implements SinkFactory {
   /// Names chosen by [finish] whose rename hasn't landed yet: nobody else may take them.
   final _reserved = <String>{};
 
+  /// The partial file of one received file (also read by [PublishingSinkFactory]).
+  String partPath(String transferId, String fileId) => _part(transferId, fileId);
+
+  /// Makes sure the partial file exists (an empty file never got a write).
+  void ensurePart(String transferId, String fileId) {
+    final part = _part(transferId, fileId);
+    if (!File(part).existsSync()) {
+      _mkdirs(_partDir(transferId));
+      File(part).createSync();
+    }
+  }
+
   String get _stateRoot => p.join(root, '.swiftdrop');
   String _partDir(String t) => p.join(_stateRoot, t);
   String _part(String t, String f) => p.join(_partDir(t), '$f.part');
@@ -283,7 +295,9 @@ const _mime = {
   '.tiff': 'image/tiff', '.dng': 'image/x-adobe-dng', '.raw': 'image/x-raw',
   '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.m4v': 'video/x-m4v', '.mkv': 'video/x-matroska', '.webm': 'video/webm',
   '.avi': 'video/x-msvideo', '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.wav': 'audio/wav', '.flac': 'audio/flac',
-  '.aac': 'audio/aac', '.pdf': 'application/pdf', '.zip': 'application/zip', '.7z': 'application/x-7z-compressed',
+  '.aac': 'audio/aac', '.ogg': 'audio/ogg', '.opus': 'audio/opus', '.wma': 'audio/x-ms-wma', '.3gp': 'video/3gpp',
+  '.mpg': 'video/mpeg', '.mpeg': 'video/mpeg', '.wmv': 'video/x-ms-wmv', '.flv': 'video/x-flv',
+  '.jxl': 'image/jxl', '.cr2': 'image/x-canon-cr2', '.nef': 'image/x-nikon-nef', '.arw': 'image/x-sony-arw', '.pdf': 'application/pdf', '.zip': 'application/zip', '.7z': 'application/x-7z-compressed',
   '.rar': 'application/vnd.rar', '.gz': 'application/gzip', '.tar': 'application/x-tar', '.txt': 'text/plain',
   '.md': 'text/markdown', '.csv': 'text/csv', '.json': 'application/json', '.doc': 'application/msword',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

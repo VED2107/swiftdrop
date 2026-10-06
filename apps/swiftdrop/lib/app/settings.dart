@@ -14,6 +14,9 @@ class AppSettings {
     this.duplicates = DuplicatePolicy.keepBoth,
     this.notifyIncoming = true,
     this.downloadDir,
+    this.mediaToGallery = true,
+    this.saveTreeUri,
+    this.saveTreeName,
   });
 
   final GlassMode glass;
@@ -25,6 +28,15 @@ class AppSettings {
   /// Where received files land; null = the platform default.
   final String? downloadDir;
 
+  /// Android: photos, videos and music go to the Gallery / Music library.
+  final bool mediaToGallery;
+
+  /// Android: the folder the person chose for everything else (null = Downloads/SwiftDrop).
+  final String? saveTreeUri;
+  final String? saveTreeName;
+
+  SaveDestination get destination => SaveDestination(mediaToGallery: mediaToGallery, treeUri: saveTreeUri, treeName: saveTreeName);
+
   AppSettings copyWith({
     GlassMode? glass,
     MotionPreference? motion,
@@ -32,6 +44,10 @@ class AppSettings {
     DuplicatePolicy? duplicates,
     bool? notifyIncoming,
     String? downloadDir,
+    bool? mediaToGallery,
+    String? saveTreeUri,
+    String? saveTreeName,
+    bool clearSaveTree = false,
   }) =>
       AppSettings(
         glass: glass ?? this.glass,
@@ -40,6 +56,9 @@ class AppSettings {
         duplicates: duplicates ?? this.duplicates,
         notifyIncoming: notifyIncoming ?? this.notifyIncoming,
         downloadDir: downloadDir ?? this.downloadDir,
+        mediaToGallery: mediaToGallery ?? this.mediaToGallery,
+        saveTreeUri: clearSaveTree ? null : (saveTreeUri ?? this.saveTreeUri),
+        saveTreeName: clearSaveTree ? null : (saveTreeName ?? this.saveTreeName),
       );
 
   Map<String, Object?> toJson() => {
@@ -49,6 +68,9 @@ class AppSettings {
         'duplicates': duplicates.name,
         'notifyIncoming': notifyIncoming,
         'downloadDir': downloadDir,
+        'mediaToGallery': mediaToGallery,
+        'saveTreeUri': saveTreeUri,
+        'saveTreeName': saveTreeName,
       };
 
   factory AppSettings.fromJson(Map<String, Object?> j) => AppSettings(
@@ -58,6 +80,9 @@ class AppSettings {
         duplicates: DuplicatePolicy.values.asNameMap()[j['duplicates']] ?? DuplicatePolicy.keepBoth,
         notifyIncoming: j['notifyIncoming'] != false,
         downloadDir: j['downloadDir'] as String?,
+        mediaToGallery: j['mediaToGallery'] != false,
+        saveTreeUri: j['saveTreeUri'] as String?,
+        saveTreeName: j['saveTreeName'] as String?,
       );
 }
 

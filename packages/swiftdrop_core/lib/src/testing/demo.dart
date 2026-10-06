@@ -80,6 +80,9 @@ class DemoDeviceDirectory implements DeviceDirectory {
 
   @override
   Future<Device> connect(String address) async => _devices.first;
+
+  @override
+  Future<Device> connectAny(List<String> addresses, {String? deviceId}) async => _devices.first;
 }
 
 /// One scripted transfer that loops: sending 24 files / 1.8 GB to "Ved's iPhone".

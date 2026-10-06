@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
@@ -10,6 +11,10 @@ import '../engine/job.dart';
 import '../engine/receiver.dart';
 import '../engine/speed_meter.dart';
 import '../io/io_files.dart';
+import '../io/publishing_sink.dart';
+import '../platform/bridge.dart';
+import '../platform/destination.dart';
+import '../platform/io_kind.dart';
 import '../platform/files.dart';
 import '../platform/system.dart';
 import '../protocol/errors.dart';
@@ -18,6 +23,7 @@ import '../services/models.dart';
 import '../services/services.dart';
 import '../transport/engine_transport.dart';
 import '../transport/lanes.dart';
+import '../transport/net_ifaces.dart';
 import '../transport/link.dart';
 import '../transport/path.dart';
 import '../util/random.dart';
@@ -44,6 +50,10 @@ class EngineConfig {
     this.webRoot,
     this.webPort = WebHost.defaultPort,
     this.version = '0.0.0',
+    this.bridge,
+    this.stagingDir,
+    this.destination = SaveDestination.standard,
+    this.debugNet = false,
   });
 
   static const defaultPort = 47800;
@@ -72,6 +82,17 @@ class EngineConfig {
   final String? webRoot;
   final int webPort;
   final String version;
+
+  /// Phones: the UI isolate's platform bridge (see [BridgeHost]). Set, received files are
+  /// staged privately and published to the public media library / a chosen folder.
+  final SendPort? bridge;
+
+  /// Private staging folder for partial files when [bridge] is set.
+  final String? stagingDir;
+  final SaveDestination destination;
+
+  /// Logs the network path (interfaces, candidates, selected address) with `[NET]`.
+  final bool debugNet;
 }
 
 class EngineRuntime {
@@ -116,6 +137,9 @@ class EngineRuntime {
   late Receiver _receiver;
   DuplicatePolicy duplicates = DuplicatePolicy.keepBoth;
   late String downloadDir = config.downloadDir;
+  late SaveDestination destination = config.destination;
+  PublishingSinkFactory? _publisher;
+  late final PlatformBridge? bridge = config.bridge == null ? null : PortBridge(config.bridge!);
   late final LaneReceiver _listener;
   WebHost? _web;
   final _webOut = <String, _WebOutgoing>{};
@@ -133,7 +157,9 @@ class EngineRuntime {
 
   Future<void> _start() async {
     await Directory(config.dataDir).create(recursive: true);
-    await Directory(downloadDir).create(recursive: true);
+    if (config.bridge == null) await Directory(downloadDir).create(recursive: true);
+    netDebug = config.debugNet;
+    if (netDebug) netLogSink = print;
     await _loadIdentity();
     await _loadDevices();
     await _loadHistory();
@@ -163,7 +189,7 @@ class EngineRuntime {
       );
       _syncWebDevices();
     }
-    _nets = await _localAddresses();
+    _nets = await _localAddresses(bridge, onRaw: (r) => _ifaces = r);
     _refreshEndpoint();
     _ticker = Timer.periodic(snapshotInterval, (_) => _publishTransfers());
     // Networks come and go (hotspot dropped, Wi-Fi joined): the QR must follow them.
@@ -172,8 +198,33 @@ class EngineRuntime {
     _publishHistory();
   }
 
+  SinkFactory _makeSinks() {
+    final b = bridge;
+    if (b == null) return IoSinkFactory(downloadDir);
+    return _publisher = PublishingSinkFactory(
+      stagingRoot: config.stagingDir ?? p.join(config.dataDir, 'staging'),
+      bridge: b,
+      destination: destination,
+    );
+  }
+
+  /// Where received files are shown to be (a folder path, or the phone's chosen place).
+  String get locationLabel => config.bridge == null ? downloadDir : (destination.treeName ?? 'Downloads/SwiftDrop');
+
+  /// (media-library files, other files) of a received transfer, phones only.
+  (int, int) _savedCounts(ReceivedTransfer? t) {
+    if (t == null || config.bridge == null) return (0, 0);
+    var media = 0;
+    var other = 0;
+    for (final f in t.files) {
+      if (f.state != FileState.complete) continue;
+      destination.targetFor(kindForMime(mimeFor(f.name))) == SaveTarget.gallery ? media++ : other++;
+    }
+    return (media, other);
+  }
+
   Receiver _makeReceiver() => Receiver(ReceiverOptions(
-        sinks: IoSinkFactory(downloadDir),
+        sinks: _makeSinks(),
         state: IoStateStore(p.join(config.dataDir, 'incoming')),
         accept: _askToAccept,
         duplicates: () => duplicates,
@@ -204,6 +255,7 @@ class EngineRuntime {
   }
 
   List<(String, String)> _nets = const [];
+  List<NetIface> _ifaces = const [];
   Timer? _netTimer;
   bool _polling = false;
 
@@ -211,7 +263,7 @@ class EngineRuntime {
     if (_polling) return;
     _polling = true;
     try {
-      final now = await _localAddresses();
+      final now = await _localAddresses(bridge, onRaw: (r) => _ifaces = r);
       final same = now.length == _nets.length && [for (var i = 0; i < now.length; i++) now[i] == _nets[i]].every((x) => x);
       if (!same) {
         _nets = now;
@@ -223,6 +275,16 @@ class EngineRuntime {
   }
 
   Future<void> setDuplicates(DuplicatePolicy policy) async => duplicates = policy;
+
+  /// Phones: where media and other files are saved. Refused while receiving, like
+  /// [setDownloadDir] (a half-received transfer must finish where it started).
+  Future<void> setDestination(SaveDestination d) async {
+    if (_incoming.values.any((i) => i.finishedAt == null)) {
+      throw TransportException(ErrorCode.forbidden, 'receiving');
+    }
+    destination = d;
+    _publisher?.destination = d;
+  }
 
   /// Where received files land. Refused while something is being received (its partial
   /// data and resume state belong to the current folder).
@@ -391,7 +453,9 @@ class EngineRuntime {
       outcome: TransferOutcome.completed,
       verified: t.filesVerified == t.files.where((f) => f.state != FileState.skipped).length,
       averageSpeed: i.meter.average(),
-      location: downloadDir,
+      location: locationLabel,
+      savedMedia: _savedCounts(t).$1,
+      savedOther: _savedCounts(t).$2,
     ));
     _dirty = true;
   }
@@ -453,6 +517,96 @@ class EngineRuntime {
     _saveDevices();
     _publishDevices();
     return _devices[d.id]!;
+  }
+
+  /// Connects to one device that may be reachable at several addresses (a QR lists every
+  /// network the other device is on). Candidates on one of our own subnets go first; the
+  /// rest follow 250 ms apart, so a wrong guess (a mobile-data address, an address on a
+  /// network we aren't on) costs nothing. The first one that accepts a TCP connection and,
+  /// when [deviceId] is known, answers with that device's id, wins.
+  Future<Device> connectAny(List<String> addresses, {String? deviceId}) async {
+    final parsed = <(String, int)>[];
+    for (final a in addresses) {
+      final (h, p) = _parseAddress(a);
+      if (!parsed.any((x) => x.$1 == h && x.$2 == p)) parsed.add((h, p));
+    }
+    final hosts = orderCandidates([for (final c in parsed) c.$1], _ifaces);
+    final ordered = [for (final h in hosts) parsed.firstWhere((c) => c.$1 == h)];
+    netLog('connectAny candidates=${ordered.map((c) => '${c.$1}:${c.$2}').join(', ')} mine=${_ifaces.map((i) => '$i').join(', ')}');
+    if (ordered.length == 1) return connect(_joinHostPort(ordered.first.$1, ordered.first.$2));
+    Object? lastError;
+    await for (final hit in _probe(ordered)) {
+      try {
+        final d = await connect(hit);
+        if (deviceId != null && !d.id.startsWith('addr:') && d.id != deviceId) {
+          netLog('wrong device at $hit, trying the next address');
+          await _transports.remove(d.id)?.close();
+          _devices.remove(d.id);
+          continue;
+        }
+        netLog('connected via $hit path=${d.path?.kind.name}');
+        return d;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    if (lastError is TransportException) throw lastError;
+    throw TransportException(ErrorCode.network, 'no address answered');
+  }
+
+  /// Addresses that accept a TCP connection, in the order they answered. Attempts start
+  /// 250 ms apart in [ordered] order; each gives up after 4 s.
+  Stream<String> _probe(List<(String, int)> ordered) {
+    late final StreamController<String> out;
+    var left = ordered.length;
+    var stopped = false;
+    out = StreamController<String>(onCancel: () => stopped = true);
+    for (var i = 0; i < ordered.length; i++) {
+      final (host, port) = ordered[i];
+      Future<void>.delayed(Duration(milliseconds: 250 * i), () async {
+        if (!stopped) {
+          try {
+            final s = await Socket.connect(host, port, timeout: const Duration(seconds: 4));
+            s.destroy();
+            netLog('probe $host:$port ok');
+            if (!stopped) out.add(_joinHostPort(host, port));
+          } catch (e) {
+            netLog('probe $host:$port failed: $e');
+          }
+        }
+        if (--left == 0) await out.close();
+      });
+    }
+    return out.stream;
+  }
+
+  /// The network changed (Wi-Fi joined or lost, hotspot toggled, VPN up or down): refresh
+  /// the addresses in the QR now instead of at the next 4 s poll.
+  Future<void> networkChanged() async {
+    netLog('network changed');
+    await _pollNetworks();
+  }
+
+  /// Plain-text network picture for "Network details" in Settings and bug reports.
+  Future<String> diagnostics() async {
+    await _pollNetworks();
+    final b = StringBuffer('Port ${_listener.port}\n');
+    b.writeln('Offered in the QR:');
+    for (final n in _nets) {
+      b.writeln('  ${n.$1} (${n.$2})');
+    }
+    if (_nets.isEmpty) b.writeln('  none: not on a Wi-Fi network or hotspot');
+    b.writeln('Interfaces seen:');
+    for (final i in _ifaces) {
+      b.writeln('  $i');
+    }
+    for (final d in _devices.values) {
+      final t = _transports[d.id];
+      if (t == null || !t.connected) continue;
+      final p = t.path;
+      b.writeln('Connected to ${d.name}: ${p?.link.name} ${p?.localAddress ?? '?'} -> ${p?.remoteAddress ?? '?'} (${p?.kind.name})');
+    }
+    return b.toString();
   }
 
   Future<String> send(String deviceId, List<SendItem> items) async {
@@ -796,7 +950,9 @@ class EngineRuntime {
       etaSeconds: basis > 0 ? (i.bytesTotal - done) / basis : null,
       startedAt: i.startedAt,
       label: i.label,
-      location: downloadDir,
+      location: locationLabel,
+      savedMedia: _savedCounts(t).$1,
+      savedOther: _savedCounts(t).$2,
     );
   }
 
@@ -917,6 +1073,8 @@ class EngineRuntime {
               verified: j['verified'] == true,
               averageSpeed: (j['speed'] as num?)?.toDouble(),
               location: j['location'] as String?,
+              savedMedia: (j['savedMedia'] as num?)?.toInt() ?? 0,
+              savedOther: (j['savedOther'] as num?)?.toInt() ?? 0,
             );
           }(),
       ];
@@ -938,6 +1096,8 @@ class EngineRuntime {
             'verified': r.verified,
             'speed': r.averageSpeed,
             'location': r.location,
+            'savedMedia': r.savedMedia,
+            'savedOther': r.savedOther,
           },
       ]).ignore();
 
@@ -1007,28 +1167,33 @@ String _joinHostPort(String host, int port) => host.contains(':') ? '[$host]:$po
   throw TransportException(ErrorCode.badRequest, 'Enter an address like 192.168.1.20:47800');
 }
 
-/// Private IPv4 addresses of this machine with their interface names, best first
-/// (Wi-Fi/Ethernet over virtual ones). Windows keeps a disconnected adapter's last address
-/// (a dropped hotspot still shows 172.20.10.x), so those adapters are skipped there.
-Future<List<(String, String)>> _localAddresses() async {
+/// Private IPv4 addresses of this machine with a label each, best first, as reachable from
+/// another device on the same network. On phones the platform layer says which link is
+/// Wi-Fi, hotspot, mobile data or VPN (see `NetBridge.kt`); elsewhere names decide.
+/// Windows keeps a disconnected adapter's last address (a dropped hotspot still shows
+/// 172.20.10.x), so those adapters are skipped there.
+Future<List<(String, String)>> _localAddresses(PlatformBridge? bridge, {void Function(List<NetIface>)? onRaw}) async {
   try {
-    final down = Platform.isWindows ? await _windowsDisconnected() : const <String>{};
-    final ifaces = await NetworkInterface.list(type: InternetAddressType.IPv4);
-    final scored = <(int, String, String)>[];
-    for (final i in ifaces) {
-      if (down.contains(i.name.toLowerCase())) continue;
-      final n = i.name.toLowerCase();
-      var virtual = n.contains('vethernet') || n.contains('virtual') || n.contains('vmware') || n.contains('docker') || n.contains('wsl') || n.contains('hyper-v');
-      for (final a in i.addresses) {
-        if (a.isLoopback || !isLocalAddress(a.address) || a.address.startsWith('169.254.')) continue;
-        // VirtualBox host-only adapters are named "Ethernet N" on Windows; their range gives them away.
-        if (a.address.startsWith('192.168.56.')) virtual = true;
-        final wifi = n.contains('wi-fi') || n.contains('wlan') || n.contains('wireless') || n.startsWith('en') || n.startsWith('wl');
-        scored.add(((virtual ? 2 : 0) + (wifi ? 0 : 1), a.address, i.name));
+    var all = <NetIface>[];
+    if (bridge != null) {
+      try {
+        final raw = await bridge.call('interfaces');
+        if (raw is List) all = [for (final m in raw) if (m is Map) NetIface.fromMap(m)];
+      } catch (_) {}
+    }
+    if (all.isEmpty) {
+      final down = Platform.isWindows ? await _windowsDisconnected() : const <String>{};
+      for (final i in await NetworkInterface.list(type: InternetAddressType.IPv4)) {
+        if (down.contains(i.name.toLowerCase())) continue;
+        for (final a in i.addresses) {
+          all.add(NetIface(name: i.name, address: a.address, kind: kindFromName(i.name)));
+        }
       }
     }
-    scored.sort((a, b) => a.$1.compareTo(b.$1));
-    return [for (final s in scored) (s.$2, s.$3)];
+    onRaw?.call(all);
+    final ranked = reachable(all);
+    netLog('interfaces=${all.map((i) => '$i').join(', ')} -> offered=${ranked.map((i) => i.address).join(', ')}');
+    return [for (final i in ranked) (i.address, kindLabel(i))];
   } catch (_) {
     return const [];
   }

@@ -4,6 +4,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Only Android 7-9 need a storage permission to write into Pictures/Movies/Downloads;
+         Android 10+ saves through MediaStore and the folder picker with no permission. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <application
         android:label="SwiftDrop"
         android:name="${applicationName}"
@@ -43,6 +46,18 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- "View in Gallery" / "Open folder": only offered when a handler exists. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.APP_GALLERY"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW_DOWNLOADS"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:mimeType="vnd.android.document/directory"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

@@ -67,6 +67,7 @@ class _ReceiveCardState extends ConsumerState<ReceiveCard> {
     final t = context.sdText;
     final ep = ref.watch(endpointProvider).value;
     final dir = ref.watch(downloadDirProvider);
+    final prefs = ref.watch(settingsProvider);
     if (ep == null || ep.primary == null) {
       return const EmptyState(
         icon: SdIcons.offline,
@@ -94,7 +95,28 @@ class _ReceiveCardState extends ConsumerState<ReceiveCard> {
             style: t.caption,
             textAlign: TextAlign.center,
           ),
-          if (dir != null) ...[
+          if (Platform.isAndroid) ...[
+            const SizedBox(height: SdSpace.s4),
+            const Divider(height: 1, color: SdColors.hairline),
+            const SizedBox(height: SdSpace.s3),
+            Row(
+              children: [
+                const Icon(SdIcons.folder, size: 18, color: SdColors.text2),
+                const SizedBox(width: SdSpace.s2),
+                Expanded(
+                  child: Text(
+                    prefs.mediaToGallery
+                        ? 'Photos and videos: Gallery\nOther files: ${saveSummary(prefs).other}'
+                        : 'All files: ${saveSummary(prefs).other}',
+                    style: t.caption,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                GlassButton(label: 'Change', kind: GlassButtonKind.quiet, compact: true, onPressed: () => context.push(Routes.settings)),
+              ],
+            ),
+          ] else if (dir != null) ...[
             const SizedBox(height: SdSpace.s4),
             const Divider(height: 1, color: SdColors.hairline),
             const SizedBox(height: SdSpace.s3),

@@ -103,6 +103,7 @@ Future<void> pumpApp(
   String route = '/',
   FakeTransfers? transfers,
 }) async {
+  Haptics.enabled = false; // the success pattern uses a timer
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);

@@ -113,7 +113,7 @@ class _ReceiveCardState extends ConsumerState<ReceiveCard> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                GlassButton(label: 'Change', kind: GlassButtonKind.quiet, compact: true, onPressed: () => context.push(Routes.settings)),
+                GlassButton(label: 'Change', kind: GlassButtonKind.quiet, compact: true, onPressed: () => context.go(Routes.settings)),
               ],
             ),
           ] else if (dir != null) ...[

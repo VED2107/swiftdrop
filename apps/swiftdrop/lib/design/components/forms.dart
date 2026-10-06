@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../haptics.dart';
 import '../icons/sd_icons.dart';
 import '../materials/liquid_glass.dart';
 import '../theme/appearance.dart';
@@ -170,10 +171,15 @@ class GlassSwitch extends StatelessWidget {
       toggled: value,
       label: label,
       child: Pressable(
-        onPressed: onChanged == null ? null : () => onChanged!(!value),
+        onPressed: onChanged == null
+            ? null
+            : () {
+                Haptics.select();
+                onChanged!(!value);
+              },
         semanticLabel: label,
         focusRadius: SdRadius.pill,
-        haptic: true,
+        haptic: false,
         child: ExcludeSemantics(
           child: AnimatedContainer(
             duration: d,
@@ -207,12 +213,16 @@ enum BannerTone { calm, success, warning }
 /// Inline message: icon + words, calm by default. Used for interruption ("your transfer is
 /// safe"), restoration and failures, never as a toast that disappears before it's read.
 class InlineBanner extends StatelessWidget {
-  const InlineBanner({super.key, required this.title, this.message, this.tone = BannerTone.calm, this.icon, this.action});
+  const InlineBanner({super.key, required this.title, this.message, this.tone = BannerTone.calm, this.icon, this.action, this.actionBelow = false});
   final String title;
   final String? message;
   final BannerTone tone;
   final IconData? icon;
   final Widget? action;
+
+  /// Puts [action] under the text instead of beside it: for banners with two buttons or a
+  /// long message, so the words keep the full width on a phone.
+  final bool actionBelow;
 
   @override
   Widget build(BuildContext context) {
@@ -234,9 +244,10 @@ class InlineBanner extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(title, style: t.bodyStrong),
               if (message != null) ...[const SizedBox(height: 2), Text(message!, style: t.caption)],
+              if (action != null && actionBelow) Padding(padding: const EdgeInsets.only(top: SdSpace.s3), child: Align(alignment: Alignment.centerRight, child: action!)),
             ]),
           ),
-          if (action != null) ...[const SizedBox(width: SdSpace.s3), action!],
+          if (action != null && !actionBelow) ...[const SizedBox(width: SdSpace.s3), action!],
         ]),
       ),
     );

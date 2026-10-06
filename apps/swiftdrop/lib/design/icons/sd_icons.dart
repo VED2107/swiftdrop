@@ -37,6 +37,7 @@ abstract final class SdIcons {
   static const close = TablerIcons.x;
   static const failed = TablerIcons.alert_triangle;
   static const info = TablerIcons.info_circle;
+  static const download = TablerIcons.download;
   static const tune = TablerIcons.adjustments_horizontal;
   static const pause = TablerIcons.player_pause;
   static const play = TablerIcons.player_play;
@@ -52,6 +53,7 @@ abstract final class SdIcons {
   static const keyboard = TablerIcons.keyboard;
   static const privacy = TablerIcons.lock;
   static const notifications = TablerIcons.bell;
+  static const haptics = TablerIcons.device_mobile_vibration;
   static const visibility = TablerIcons.eye;
 
   static IconData device(DeviceKind kind) => switch (kind) {

@@ -59,6 +59,14 @@ class SettingsController extends Notifier<AppSettings> {
   void setContrast(ContrastPreference v) => _set(state.copyWith(contrast: v));
   void setNotify(bool v) => _set(state.copyWith(notifyIncoming: v));
 
+  void setAutoUpdate(bool v) => _set(state.copyWith(autoUpdate: v));
+
+  void setHaptics(bool v) {
+    Haptics.enabled = v;
+    if (v) Haptics.select(); // let the person feel what they just turned on
+    _set(state.copyWith(haptics: v));
+  }
+
   Future<void> setDuplicates(DuplicatePolicy v) async {
     await ref.read(engineProvider)?.setDuplicates(v);
     _set(state.copyWith(duplicates: v));

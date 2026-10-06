@@ -1,7 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../haptics.dart';
 import '../theme/appearance.dart';
 import '../tokens/colors.dart';
 import '../tokens/motion.dart';
@@ -42,12 +41,9 @@ class _PressableState extends State<Pressable> {
 
   void _activate() {
     if (!_enabled) return;
-    if (widget.haptic && _isTouchPlatform) HapticFeedback.lightImpact();
+    if (widget.haptic) Haptics.tap();
     widget.onPressed!();
   }
-
-  static bool get _isTouchPlatform =>
-      defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android;
 
   @override
   Widget build(BuildContext context) {

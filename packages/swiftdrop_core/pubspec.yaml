@@ -1,6 +1,6 @@
 name: swiftdrop_core
 description: SwiftDrop protocol, transfer engine, transports and platform boundaries. Pure Dart, no Flutter.
-version: 1.0.0
+version: 1.1.0
 publish_to: none
 resolution: workspace
 

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Where the in-app updater puts a downloaded installer (Dart's temporary directory). -->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>

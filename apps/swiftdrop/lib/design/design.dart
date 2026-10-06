@@ -2,6 +2,7 @@
 library;
 
 export 'components/completion_mark.dart';
+export 'haptics.dart';
 export 'components/device_glass_card.dart';
 export 'components/empty_state.dart';
 export 'components/files.dart';

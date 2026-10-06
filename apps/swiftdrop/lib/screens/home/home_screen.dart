@@ -10,6 +10,7 @@ import '../../app/shell.dart';
 import '../../design/clay/clay.dart';
 import '../../design/design.dart';
 import '../receive/receive_screen.dart';
+import '../settings/update_ui.dart';
 
 /// Home is one instrument: this device on the left, the destination on the right, and the
 /// transfer rail between them. Choose a destination with its key, press the red Send key,
@@ -78,6 +79,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           message: 'SwiftDrop couldn’t start its local connection. Restart the app; if it keeps happening, check that no other program blocks it.',
         ),
       ],
+      const UpdateBanner(),
       const SizedBox(height: SdSpace.s6),
       console,
       const SizedBox(height: SdSpace.s8),

@@ -56,6 +56,8 @@ Name: "{autodesktop}\SwiftDrop"; Filename: "{app}\swiftdrop.exe"; Tasks: desktop
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""SwiftDrop"""; Flags: runhidden; Tasks: firewall
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""SwiftDrop"" dir=in action=allow program=""{app}\swiftdrop.exe"" profile=private enable=yes"; Flags: runhidden; Tasks: firewall
 Filename: "{app}\swiftdrop.exe"; Description: "{cm:LaunchProgram,SwiftDrop}"; Flags: nowait postinstall skipifsilent
+; An in-app update runs this installer silently: bring the app back up when it is done.
+Filename: "{app}\swiftdrop.exe"; Flags: nowait runasoriginaluser; Check: WizardSilent
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM swiftdrop.exe"; Flags: runhidden; RunOnceId: "StopSwiftDrop"

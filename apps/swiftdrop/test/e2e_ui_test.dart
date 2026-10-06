@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'package:swiftdrop/app/app.dart';
 import 'package:swiftdrop/app/picking.dart';
 import 'package:swiftdrop/app/providers.dart';
+import 'package:swiftdrop/design/design.dart';
 import 'package:swiftdrop_core/runtime.dart';
 import 'package:swiftdrop_core/swiftdrop_core.dart';
 
@@ -19,6 +20,7 @@ import 'helpers.dart';
 /// isolate, real TCP lanes, real files), and the real screens driving one of them.
 void main() {
   testWidgets('connect by address, send from the UI, the other side accepts, the UI shows complete', (tester) async {
+    Haptics.enabled = false; // the success pattern uses a timer
     tester.view.physicalSize = phone;
     tester.view.devicePixelRatio = 1;
     tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);

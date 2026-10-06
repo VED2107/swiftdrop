@@ -75,6 +75,25 @@ class AppShell extends ConsumerWidget {
             child: _TabSwitch(index: shell.currentIndex, child: shell),
           ),
         ),
+        // Content scrolls under the status bar: a short fade to the ground keeps the clock
+        // and icons legible instead of running into the text beneath them.
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: mq.padding.top + 14,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [SdColors.ground.withValues(alpha: 0.94), SdColors.ground.withValues(alpha: 0)],
+                ),
+              ),
+            ),
+          ),
+        ),
         Positioned(
           left: 0,
           right: 0,

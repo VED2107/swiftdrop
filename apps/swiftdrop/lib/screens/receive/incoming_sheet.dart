@@ -27,6 +27,7 @@ class _IncomingSheetState extends ConsumerState<IncomingSheet> {
   @override
   void initState() {
     super.initState();
+    Haptics.arrive();
     if (ref.read(settingsProvider).notifyIncoming) SystemSound.play(SystemSoundType.alert);
   }
 

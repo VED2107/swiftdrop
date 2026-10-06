@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../haptics.dart';
 import '../theme/appearance.dart';
 import '../tokens/colors.dart';
 import '../tokens/motion.dart';
@@ -146,7 +146,7 @@ class _ClayKeyState extends State<ClayKey> with SingleTickerProviderStateMixin {
             onTapCancel: _up,
             onTap: enabled
                 ? () {
-                    HapticFeedback.lightImpact();
+                    Haptics.tap();
                     widget.onPressed!();
                   }
                 : null,
@@ -248,7 +248,7 @@ class _ClaySendKeyState extends State<ClaySendKey> with TickerProviderStateMixin
           onTapCancel: () => _press.reverse(),
           onTap: enabled
               ? () {
-                  HapticFeedback.mediumImpact();
+                  Haptics.arrive();
                   widget.onPressed!();
                 }
               : null,

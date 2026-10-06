@@ -1,6 +1,12 @@
 package app.swiftdrop.swiftdrop
 
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.core.content.FileProvider
+import java.io.File
+import android.os.Build
+import android.view.HapticFeedbackConstants
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -26,6 +32,8 @@ class MainActivity : FlutterActivity() {
             if (storage.handle(call, result)) return@setMethodCallHandler
             when (call.method) {
                 "interfaces" -> result.success(nb.interfaces())
+                "haptic" -> result.success(haptic(call.argument<String>("effect")))
+                "installApk" -> result.success(installApk(call.argument<String>("path")))
                 "watchNetwork" -> {
                     nb.start()
                     result.success(null)
@@ -33,6 +41,38 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    /**
+     * Opens the downloaded APK in the system installer. Android asks the person once to
+     * allow installs from SwiftDrop; until then this opens that settings page and says so.
+     */
+    private fun installApk(path: String?): String {
+        if (path == null) return "unsupported"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            startActivity(
+                Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+            return "needsPermission"
+        }
+        val uri = FileProvider.getUriForFile(this, "$packageName.updates", File(path))
+        startActivity(
+            Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        return "started"
+    }
+
+    /** System CONFIRM / REJECT effects (Android 11+), tuned by each phone for its own motor. */
+    private fun haptic(effect: String?): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+        val c = when (effect) {
+            "confirm" -> HapticFeedbackConstants.CONFIRM
+            "reject" -> HapticFeedbackConstants.REJECT
+            else -> return false
+        }
+        return window?.decorView?.performHapticFeedback(c) ?: false
     }
 
     @Deprecated("Deprecated in Java")

@@ -9,12 +9,15 @@ import qrIcon from "@phosphor-icons/core/assets/bold/qr-code-bold.svg?raw";
 
 document.documentElement.classList.add("js");
 
-const DOWNLOAD_URL: string = import.meta.env.VITE_DOWNLOAD_URL || "https://github.com/VED2107/swiftdrop/releases/download/v1.0.0/SwiftDrop-Setup-1.0.0.exe";
+const DOWNLOAD_URL: string = import.meta.env.VITE_DOWNLOAD_URL || "https://github.com/VED2107/swiftdrop/releases/download/v1.1.0/SwiftDrop-Setup-1.1.0.exe";
 // The Android APK ships on the same releases page until it is in a store.
-const ANDROID_URL: string = import.meta.env.VITE_ANDROID_URL || "https://github.com/VED2107/swiftdrop/releases/download/v1.0.0/SwiftDrop-1.0.0.apk";
+const ANDROID_URL: string = import.meta.env.VITE_ANDROID_URL || "https://github.com/VED2107/swiftdrop/releases/download/v1.1.0/SwiftDrop-1.1.0.apk";
 const reduced = matchMedia("(prefers-reduced-motion: reduce)");
 
 for (const a of document.querySelectorAll<HTMLAnchorElement>("[data-download]")) a.href = DOWNLOAD_URL;
+// The version shown on the page is the one the download links point at.
+const VERSION = /v(\d+\.\d+\.\d+)\//.exec(DOWNLOAD_URL)?.[1] ?? "";
+if (VERSION) for (const n of document.querySelectorAll("[data-version]")) n.textContent = VERSION;
 for (const a of document.querySelectorAll<HTMLAnchorElement>("[data-android]")) a.href = ANDROID_URL;
 // On a phone the installer isn't for this device: say where it goes instead.
 if (/iPhone|iPad|Android/.test(navigator.userAgent)) {

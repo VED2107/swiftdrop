@@ -40,7 +40,7 @@ import java.util.concurrent.Executors
  * Bytes are streamed (FileChannel.transferTo or 1 MiB buffers): never loaded whole.
  */
 class StorageBridge(private val activity: Activity) {
-    private val io = Executors.newFixedThreadPool(3)
+    private val io = Executors.newFixedThreadPool(4)
     private val main = Handler(Looper.getMainLooper())
     private val resolver get() = activity.contentResolver
     private var pendingPick: MethodChannel.Result? = null
@@ -157,12 +157,10 @@ class StorageBridge(private val activity: Activity) {
         val uri = resolver.insert(col, values) ?: throw IOException("could not create entry")
         try {
             copyTo(src, uri)
-            val done = ContentValues().apply {
-                put(MediaStore.MediaColumns.IS_PENDING, 0)
-                if (modified > 0) put(MediaStore.MediaColumns.DATE_MODIFIED, modified / 1000)
-            }
-            resolver.update(uri, done, null, null)
+            // Original modification time on the file itself (the MediaStore column is
+            // re-stamped by the provider), then publish with a single update.
             if (modified > 0) keepModified(uri, modified)
+            resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
         } catch (e: Exception) {
             try { resolver.delete(uri, null, null) } catch (_: Exception) {}
             throw e
@@ -171,14 +169,12 @@ class StorageBridge(private val activity: Activity) {
         return mapOf("display" to "$rel/$stored", "uri" to uri.toString())
     }
 
-    /** MediaStore stamps "now" when it publishes; put the original modification time back. */
+    /** The provider stamps "now" when it publishes a file; put the original time back on the file. */
     private fun keepModified(uri: Uri, modified: Long) {
         try {
             resolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)?.use { c ->
                 if (c.moveToFirst()) c.getString(0)?.let { File(it).setLastModified(modified) }
             }
-            val v = ContentValues().apply { put(MediaStore.MediaColumns.DATE_MODIFIED, modified / 1000) }
-            resolver.update(uri, v, null, null)
         } catch (_: Exception) {
             // not fatal: the file is complete and visible, just stamped with the arrival time
         }

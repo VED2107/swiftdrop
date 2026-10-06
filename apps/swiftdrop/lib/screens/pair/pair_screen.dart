@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -100,7 +99,7 @@ class _PairScreenState extends ConsumerState<PairScreen> {
               : directory.connectAny([addr, ...alternates], deviceId: deviceId))
           .timeout(_connectTimeout);
       if (mounted) setState(() => _found = d);
-      HapticFeedback.mediumImpact();
+      Haptics.success();
       debugPrint('[PAIR] ready peer=${_redact(d.id)} path=${d.path == null ? "?" : pathLabel(d.path)}');
       return true;
     } on TimeoutException {
@@ -337,12 +336,12 @@ class _ScanCodeState extends State<_ScanCode> with WidgetsBindingObserver {
     final code = readScannedCode(raw);
     if (code.problem != null) {
       debugPrint('[QR] rejected ${code.problem!.name} len=${raw.length}');
-      HapticFeedback.heavyImpact();
+      Haptics.problem();
       setState(() => _problem = code.problem);
       return;
     }
     debugPrint('[QR] decoded v$connectCodeVersion');
-    HapticFeedback.selectionClick();
+    Haptics.select();
     setState(() => _problem = null);
     // On success the pair screen swaps this widget for "Connected"; on failure the
     // camera stays held and the error offers Scan again.

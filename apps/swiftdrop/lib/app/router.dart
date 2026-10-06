@@ -73,17 +73,29 @@ CustomTransitionPage<void> _flow(GoRouterState state, Widget child) => CustomTra
       reverseTransitionDuration: SdMotion.small,
       transitionsBuilder: (context, animation, secondary, child) {
         final curve = CurvedAnimation(parent: animation, curve: SdMotion.easeOut, reverseCurve: Curves.easeIn);
-        if (SdAppearance.of(context).reduceMotion) return FadeTransition(opacity: curve, child: child);
-        return FadeTransition(
-          opacity: curve,
-          child: AnimatedBuilder(
-            animation: curve,
-            builder: (_, c) => Transform.translate(
-              offset: Offset(0, 16 * (1 - curve.value)),
-              child: Transform.scale(scale: 0.985 + 0.015 * curve.value, child: c),
-            ),
-            child: child,
+        final reduce = SdAppearance.of(context).reduceMotion;
+        // Mid-transition the section underneath and the flow are both half visible, so
+        // their text overlaps. A ground-coloured scrim that peaks at the crossover hides
+        // the section just as the flow arrives (and fades out again before the end).
+        final scrim = AnimatedBuilder(
+          animation: curve,
+          builder: (_, _) => IgnorePointer(
+            child: ColoredBox(color: SdColors.ground.withValues(alpha: 0.92 * 4 * curve.value * (1 - curve.value))),
           ),
         );
+        final page = reduce
+            ? FadeTransition(opacity: curve, child: child)
+            : FadeTransition(
+                opacity: curve,
+                child: AnimatedBuilder(
+                  animation: curve,
+                  builder: (_, c) => Transform.translate(
+                    offset: Offset(0, 16 * (1 - curve.value)),
+                    child: Transform.scale(scale: 0.985 + 0.015 * curve.value, child: c),
+                  ),
+                  child: child,
+                ),
+              );
+        return Stack(fit: StackFit.expand, children: [Positioned.fill(child: scrim), page]);
       },
     );

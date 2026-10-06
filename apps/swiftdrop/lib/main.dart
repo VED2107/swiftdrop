@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:swiftdrop_core/runtime.dart';
@@ -13,12 +14,15 @@ import 'app/app.dart';
 import 'app/platform.dart';
 import 'app/providers.dart';
 import 'app/settings.dart';
+import 'app/updates.dart';
 import 'app/web_assets.dart';
+import 'screens/settings/update_ui.dart';
+import 'design/haptics.dart';
 
 /// Shown to browser guests (`/api/info`) and in About.
 const appVersion = String.fromEnvironment(
   'SWIFTDROP_VERSION',
-  defaultValue: '1.0.0',
+  defaultValue: '1.1.0',
 );
 
 Future<void> main() async {
@@ -33,6 +37,8 @@ Future<void> main() async {
   await support.create(recursive: true);
   final settingsFile = SettingsFile(p.join(support.path, 'settings.json'));
   var settings = settingsFile.load();
+  Haptics.enabled = settings.haptics;
+  if (PlatformLink.available) Haptics.nativeEffect = PlatformLink.haptic;
 
   EngineHost? engine;
   Object? engineError;
@@ -78,10 +84,15 @@ Future<void> main() async {
     }
   }
 
+  final version = await PackageInfo.fromPlatform().then((i) => i.version, onError: (_) => appVersion);
+  final canUpdate = !demoMode && (Platform.isAndroid || Platform.isWindows);
+
   runApp(
     ProviderScope(
       overrides: [
         settingsFileProvider.overrideWithValue(settingsFile),
+        appVersionProvider.overrideWithValue(version),
+        if (canUpdate) updaterProvider.overrideWithValue(GithubUpdater()),
         if (engine != null) ...[
           engineProvider.overrideWithValue(engine),
           deviceDirectoryProvider.overrideWithValue(engine),
@@ -94,7 +105,7 @@ Future<void> main() async {
           transferHistoryProvider.overrideWithValue(DemoTransferHistory()),
         ],
       ],
-      child: SwiftDropApp(engineError: engineError),
+      child: AutoUpdateCheck(child: SwiftDropApp(engineError: engineError)),
     ),
   );
 }

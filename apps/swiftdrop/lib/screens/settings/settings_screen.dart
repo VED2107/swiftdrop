@@ -11,6 +11,7 @@ import '../../app/providers.dart';
 import '../../app/router.dart';
 import '../../design/design.dart';
 import '../screen_frame.dart';
+import 'update_ui.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -81,7 +82,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                   if (prefs.saveTreeUri != null || !prefs.mediaToGallery)
                     GlassButton(
-                      label: 'Reset',
+                      label: 'Use default',
                       kind: GlassButtonKind.quiet,
                       compact: true,
                       onPressed: () => _storage(settings.resetSaveLocation),
@@ -191,6 +192,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         SettingsGroup(
           title: 'Notifications',
           children: [
+            if (Platform.isAndroid || Platform.isIOS)
+              SettingsRow(
+                title: 'Haptic feedback',
+                icon: SdIcons.haptics,
+                detail: 'A tap on keys, a click on switches, and a distinct buzz when a transfer arrives, finishes or fails.',
+                trailing: GlassSwitch(value: prefs.haptics, onChanged: settings.setHaptics, label: 'Haptic feedback'),
+              ),
             SettingsRow(
               title: 'Sound for incoming transfers',
               icon: SdIcons.notifications,
@@ -202,7 +210,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         SettingsGroup(
           title: 'About',
           children: [
-            const SettingsRow(title: 'SwiftDrop', detail: 'Version 0.3.0 (preview)'),
+            ...updateRows(context, ref, auto: prefs.autoUpdate, onAuto: settings.setAutoUpdate),
             SettingsRow(title: 'Open-source licenses', onTap: () => showLicensePage(context: context, applicationName: 'SwiftDrop')),
           ],
         ),

@@ -15,6 +15,8 @@ class AppSettings {
     this.notifyIncoming = true,
     this.downloadDir,
     this.mediaToGallery = true,
+    this.haptics = true,
+    this.autoUpdate = true,
     this.saveTreeUri,
     this.saveTreeName,
   });
@@ -31,6 +33,12 @@ class AppSettings {
   /// Android: photos, videos and music go to the Gallery / Music library.
   final bool mediaToGallery;
 
+  /// Touch feedback on phones.
+  final bool haptics;
+
+  /// Ask GitHub for the newest version when the app opens.
+  final bool autoUpdate;
+
   /// Android: the folder the person chose for everything else (null = Downloads/SwiftDrop).
   final String? saveTreeUri;
   final String? saveTreeName;
@@ -45,6 +53,8 @@ class AppSettings {
     bool? notifyIncoming,
     String? downloadDir,
     bool? mediaToGallery,
+    bool? haptics,
+    bool? autoUpdate,
     String? saveTreeUri,
     String? saveTreeName,
     bool clearSaveTree = false,
@@ -57,6 +67,8 @@ class AppSettings {
         notifyIncoming: notifyIncoming ?? this.notifyIncoming,
         downloadDir: downloadDir ?? this.downloadDir,
         mediaToGallery: mediaToGallery ?? this.mediaToGallery,
+        haptics: haptics ?? this.haptics,
+        autoUpdate: autoUpdate ?? this.autoUpdate,
         saveTreeUri: clearSaveTree ? null : (saveTreeUri ?? this.saveTreeUri),
         saveTreeName: clearSaveTree ? null : (saveTreeName ?? this.saveTreeName),
       );
@@ -69,6 +81,8 @@ class AppSettings {
         'notifyIncoming': notifyIncoming,
         'downloadDir': downloadDir,
         'mediaToGallery': mediaToGallery,
+        'haptics': haptics,
+        'autoUpdate': autoUpdate,
         'saveTreeUri': saveTreeUri,
         'saveTreeName': saveTreeName,
       };
@@ -81,6 +95,8 @@ class AppSettings {
         notifyIncoming: j['notifyIncoming'] != false,
         downloadDir: j['downloadDir'] as String?,
         mediaToGallery: j['mediaToGallery'] != false,
+        haptics: j['haptics'] != false,
+        autoUpdate: j['autoUpdate'] != false,
         saveTreeUri: j['saveTreeUri'] as String?,
         saveTreeName: j['saveTreeName'] as String?,
       );

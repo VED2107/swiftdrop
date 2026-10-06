@@ -43,6 +43,19 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
         if (mounted) setState(() => _restoredAt = null);
       });
     }
+    // A buzz only for what happens while looking at the screen, not when reopening a
+    // transfer that finished earlier.
+    if (_lastPhase != null && _lastPhase != s.phase) {
+      switch (s.phase) {
+        case TransferPhase.complete:
+          Haptics.success();
+        case TransferPhase.failed:
+          Haptics.problem();
+        case TransferPhase.running when _lastPhase == TransferPhase.reconnecting:
+          Haptics.tap();
+        default:
+      }
+    }
     _lastPhase = s.phase;
   }
 

@@ -32,6 +32,17 @@ class PlatformLink {
     return _host;
   }
 
+  /// A system haptic effect (`confirm`, `reject`). False when this phone has no such effect
+  /// (Android before 11): the caller falls back to impact patterns.
+  static Future<bool> haptic(String effect) async {
+    if (!available) return false;
+    try {
+      return await _channel.invokeMethod<bool>('haptic', {'effect': effect}) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static void setNetworkListener(void Function()? f) => _onNetworkChanged = f;
 
   static int? _sdk;

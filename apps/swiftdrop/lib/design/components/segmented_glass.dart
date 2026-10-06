@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../haptics.dart';
 import '../materials/liquid_glass.dart';
 import '../tokens/colors.dart';
 import '../tokens/materials.dart';
@@ -34,7 +35,10 @@ class SegmentedGlass<T> extends StatelessWidget {
                 selected: e.key == value,
                 inMutuallyExclusiveGroup: true,
                 child: Pressable(
-                  onPressed: () => onChanged(e.key),
+                  onPressed: () {
+                    if (e.key != value) Haptics.select();
+                    onChanged(e.key);
+                  },
                   semanticLabel: e.value,
                   focusRadius: SdRadius.chip,
                   haptic: false,
